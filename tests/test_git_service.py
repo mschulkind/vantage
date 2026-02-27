@@ -340,9 +340,9 @@ def test_recently_changed_files_sorted_by_date(git_repo):
     # The old untracked file should NOT be first — tracked files with
     # more recent dates should precede it.
     paths = [f["path"] for f in recent]
-    assert (
-        paths[0] != "old_untracked.md"
-    ), "Old untracked file incorrectly appeared first despite having an older date"
+    assert paths[0] != "old_untracked.md", (
+        "Old untracked file incorrectly appeared first despite having an older date"
+    )
 
 
 class TestUntrackedLifecycle:
@@ -377,9 +377,7 @@ class TestUntrackedLifecycle:
         """After 'git add' (but no commit), the file is either ITA or untracked."""
         service = GitService(git_repo)
         (git_repo / "staged.md").write_text("# Staged\n")
-        subprocess.run(
-            ["git", "add", "staged.md"], cwd=git_repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", "staged.md"], cwd=git_repo, check=True, capture_output=True)
         self._clear_recent_cache()
         results = service.get_recently_changed_files(limit=30)
         entry = self._find(results, "staged.md")
@@ -449,9 +447,7 @@ class TestUntrackedLifecycle:
         r3 = service.get_recently_changed_files(limit=30)
         e3 = self._find(r3, "lifecycle.md")
         assert e3 is not None, "Phase 3: lifecycle.md not in results"
-        assert e3["untracked"] is False, (
-            f"Phase 3: lifecycle.md still untracked after commit: {e3}"
-        )
+        assert e3["untracked"] is False, f"Phase 3: lifecycle.md still untracked after commit: {e3}"
         assert e3["message"] == "commit lifecycle.md"
 
     def test_nested_file_lifecycle(self, git_repo):
@@ -507,9 +503,7 @@ class TestUntrackedLifecycle:
             assert e["untracked"] is True, f"{name} should be untracked before commit"
 
         # Commit all at once
-        subprocess.run(
-            ["git", "add", "-A"], cwd=git_repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", "-A"], cwd=git_repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "batch commit"],
             cwd=git_repo,
@@ -521,9 +515,7 @@ class TestUntrackedLifecycle:
         for name in ["a.md", "b.md", "sub/c.md"]:
             e = self._find(r2, name)
             assert e is not None, f"{name} not found after commit"
-            assert e["untracked"] is False, (
-                f"{name} still untracked after commit: {e}"
-            )
+            assert e["untracked"] is False, f"{name} still untracked after commit: {e}"
 
     def test_cache_does_not_serve_stale_untracked_status(self, git_repo):
         """After commit + cache clear, untracked flag must update."""
@@ -537,9 +529,7 @@ class TestUntrackedLifecycle:
         assert e1["untracked"] is True
 
         # Commit the file
-        subprocess.run(
-            ["git", "add", "cached.md"], cwd=git_repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", "cached.md"], cwd=git_repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "commit cached.md"],
             cwd=git_repo,
@@ -620,11 +610,15 @@ def _init_git_repo(path):
     subprocess.run(["git", "init"], cwd=path, check=True, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
-        cwd=path, check=True, capture_output=True,
+        cwd=path,
+        check=True,
+        capture_output=True,
     )
     subprocess.run(
         ["git", "config", "user.name", "Test User"],
-        cwd=path, check=True, capture_output=True,
+        cwd=path,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -634,6 +628,7 @@ class TestMultiGitRepos:
     @staticmethod
     def _clear_cache():
         from vantage.services.git_service import _recent_files_cache
+
         _recent_files_cache.clear()
 
     @staticmethod
@@ -655,7 +650,9 @@ class TestMultiGitRepos:
         subprocess.run(["git", "add", "."], cwd=repo_a, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Initial A"],
-            cwd=repo_a, check=True, capture_output=True,
+            cwd=repo_a,
+            check=True,
+            capture_output=True,
         )
 
         # Child repo B: project_b with committed + untracked files
@@ -666,7 +663,9 @@ class TestMultiGitRepos:
         subprocess.run(["git", "add", "."], cwd=repo_b, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Initial B"],
-            cwd=repo_b, check=True, capture_output=True,
+            cwd=repo_b,
+            check=True,
+            capture_output=True,
         )
         (repo_b / "draft.md").write_text("# Draft\n")  # untracked
 
@@ -762,9 +761,7 @@ class TestMultiGitRepos:
         results = service.get_recently_changed_files(limit=30)
         dates = [r["date"] for r in results]
         for i in range(len(dates) - 1):
-            assert dates[i] >= dates[i + 1], (
-                f"Not sorted at index {i}: {dates[i]} < {dates[i + 1]}"
-            )
+            assert dates[i] >= dates[i + 1], f"Not sorted at index {i}: {dates[i]} < {dates[i + 1]}"
 
     def test_no_child_repos_falls_back_to_untracked(self, tmp_path):
         """Parent with no child git repos shows all files as untracked."""
@@ -821,7 +818,9 @@ class TestMultiGitRepos:
         subprocess.run(["git", "add", "."], cwd=repo_a, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Update README"],
-            cwd=repo_a, check=True, capture_output=True,
+            cwd=repo_a,
+            check=True,
+            capture_output=True,
         )
 
         service = GitService(parent_with_child_repos)
@@ -833,9 +832,7 @@ class TestMultiGitRepos:
         assert diff is not None
         assert diff.commit_hexsha == commit.hexsha
 
-    def test_get_last_commits_batch_delegates_to_child_repos(
-        self, parent_with_child_repos
-    ):
+    def test_get_last_commits_batch_delegates_to_child_repos(self, parent_with_child_repos):
         """get_last_commits_batch returns commits for files across child repos."""
         service = GitService(parent_with_child_repos)
         paths = [
