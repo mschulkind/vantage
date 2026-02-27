@@ -1,0 +1,133 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar — light */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Custom scrollbar — dark */
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+code {
+  font-family: 'JetBrains Mono', 'Fira Code', source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+/* GitHub highlight.js dark override — comprehensive token colors */
+.dark .hljs {
+  background: transparent !important;
+  color: #e6edf3 !important;
+}
+
+.dark .hljs-comment,
+.dark .hljs-quote {
+  color: #8b949e !important;
+  font-style: italic;
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-built_in,
+.dark .hljs-type {
+  color: #ff7b72 !important;
+}
+
+.dark .hljs-string,
+.dark .hljs-attr,
+.dark .hljs-addition {
+  color: #a5d6ff !important;
+}
+
+.dark .hljs-number,
+.dark .hljs-literal,
+.dark .hljs-variable,
+.dark .hljs-template-variable {
+  color: #79c0ff !important;
+}
+
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-name {
+  color: #d2a8ff !important;
+}
+
+.dark .hljs-selector-id,
+.dark .hljs-selector-class {
+  color: #7ee787 !important;
+}
+
+.dark .hljs-deletion {
+  color: #ffa198 !important;
+}
+
+.dark .hljs-meta {
+  color: #d2a8ff !important;
+}
+
+.dark .hljs-symbol,
+.dark .hljs-bullet,
+.dark .hljs-link {
+  color: #79c0ff !important;
+}
+
+/* Reset inline-code styles for code inside pre blocks (fenced code blocks).
+   Without this, prose-code:* utilities apply inline-pill styling (background,
+   padding, border, small font) to block-level code elements, breaking ASCII art
+   and adding unwanted leading space. */
+.prose pre code {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  display: block;
+}
+
+/* Flash animation for content that just changed */
+@keyframes flash-update {
+  0% { background-color: rgb(251 191 36 / 0.18); }
+  100% { background-color: transparent; }
+}
+
+.animate-flash-update {
+  animation: flash-update 1.5s ease-out;
+}
+
+.dark .animate-flash-update {
+  animation: flash-update-dark 1.5s ease-out;
+}
+
+@keyframes flash-update-dark {
+  0% { background-color: rgb(251 191 36 / 0.1); }
+  100% { background-color: transparent; }
+}

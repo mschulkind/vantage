@@ -1,0 +1,35 @@
+[tool.uv]
+package = true
+
+[project]
+name = "vantage"
+version = "0.0.1"
+description = "A beautiful local Markdown viewer with live reload and Git awareness"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.3.1",
+    "fastapi>=0.128.0",
+    "gitpython>=3.1.46",
+    "httpx>=0.28.1",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
+    "python-multipart>=0.0.21",
+    "uvicorn[standard]>=0.40.0",
+    "watchfiles>=1.1.1",
+]
+
+[project.scripts]
+vantage = "vantage.cli:main"
+
+[tool.setuptools.package-data]
+vantage = ["frontend_dist/**/*"]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.37.0",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.10",
+]

@@ -1,0 +1,152 @@
+# Static Sites
+
+Vantage can generate a fully self-contained static site from any directory of Markdown files. The output is a folder of HTML, CSS, JS, and pre-rendered JSON that works without a backend — deploy it anywhere.
+
+This is ideal for:
+
+- **Publishing documentation** to Cloudflare Pages, GitHub Pages, Netlify, or Vercel
+- **Sharing rendered Markdown** without requiring readers to install anything
+- **Archiving** a snapshot of your docs with full Git history and diffs
+
+## Quick Start
+
+```bash
+# Build a static site from your docs directory
+vantage build ~/projects/my-docs -o ./output -n "My Docs"
+
+# Preview it locally
+cd output && python -m http.server 8080
+```
+
+Open `http://localhost:8080` — you'll see the full Vantage UI with file tree, Markdown rendering, Mermaid diagrams, Git history, and diffs, all running entirely from static files.
+
+## How It Works
+
+The `vantage build` command:
+
+1. **Copies the frontend** — the same React UI used by the live server
+2. **Pre-renders all API data** — every file, directory listing, Git commit, and diff is saved as a JSON file
+3. **Injects static mode** — the frontend detects it's running without a backend and reads from the JSON files instead of making API calls
+
+The result is a completely static site. No Python, no server, no WebSocket — just files.
+
+## Deploying Under a Subpath
+
+If your static site will be hosted at a subpath (e.g., `https://example.com/docs/` instead of `https://example.com/`), use the `--base-path` option:
+
+```bash
+vantage build ./content -o ./output -n "My Docs" --base-path /docs/
+```
+
+This ensures all asset paths and internal links resolve correctly.
+
+## Deployment Examples
+
+### Cloudflare Pages
+
+```bash
+# Build
+vantage build ./docs -o ./site -n "My Project Docs"
+
+# Deploy
+npx wrangler pages deploy ./site
+```
+
+Or configure automatic deployments by adding a build step to your Cloudflare Pages project:
+
+```bash
+# In your build command:
+pip install .  # or: uv pip install .
+vantage build docs/ -o site/docs --base-path /docs/
+```
+
+### GitHub Pages
+
+```bash
+# Build to the docs/ directory (GitHub Pages default)
+vantage build ./content -o ./docs -n "My Docs"
+
+# Commit and push
+git add docs/
+git commit -m "Update static docs"
+git push
+```
+
+Then enable GitHub Pages in your repository settings, pointing to the `/docs` folder.
+
+### Nginx / Any Static Server
+
+```bash
+vantage build ./content -o /var/www/docs -n "Documentation"
+```
+
+The output directory can be served by any HTTP server. No special configuration needed — just serve the files.
+
+### As Part of a Build Pipeline
+
+Add `vantage build` to your CI/CD pipeline or site generation workflow:
+
+```yaml
+# Example GitHub Actions step
+- name: Build documentation
+  run: |
+    pip install .
+    vantage build docs/ -o site/ -n "Project Docs"
+
+- name: Deploy to Pages
+  uses: actions/deploy-pages@v4
+  with:
+    path: site/
+```
+
+## What Gets Generated
+
+The output directory contains:
+
+```
+output/
+  index.html              # Main app entry point
+  assets/                 # Frontend CSS, JS, fonts
+  api/
+    static.json           # Static mode marker
+    repos.json            # Repository list
+    info.json             # Repository metadata
+    files.json            # List of all files
+    health.json           # Health check
+    tree/
+      _.json              # Root directory listing
+      subdir.json         # Subdirectory listings
+    content/
+      file.md.json        # Content for each file
+    git/
+      recent.json         # Recently changed files
+      history/
+        file.md.json      # Commit history per file
+      status/
+        file.md.json      # Latest commit per file
+      diff/
+        file.md/
+          abc123.json     # Diff for each commit
+  _redirects              # SPA fallback routing
+  _headers                # Cache and security headers
+```
+
+## Options Reference
+
+| Option            | Default            | Description                                |
+| ----------------- | ------------------ | ------------------------------------------ |
+| `PATH`            | _required_         | Source directory with Markdown files       |
+| `--output`, `-o`  | `./vantage-static` | Where to write the static site             |
+| `--name`, `-n`    | Directory name     | Display name shown in the UI header        |
+| `--base-path`     | `/`                | URL base path for subpath deployments      |
+| `--frontend-dist` | _(auto-build)_     | Pre-built frontend assets (skips building) |
+
+## Limitations
+
+Static sites are a snapshot — they don't include:
+
+- **Live reload** — no WebSocket connection, so file changes aren't reflected
+- **Search** — the file picker still works (all filenames are included), but there's no full-text search
+- **Updates** — rebuild and redeploy to pick up new content
+
+For a live, updating experience, use `vantage serve` or `vantage daemon` instead.
