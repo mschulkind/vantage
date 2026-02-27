@@ -543,9 +543,7 @@ class GitService:
                                 all_results.append(
                                     {
                                         "path": rel,
-                                        "date": datetime.fromtimestamp(
-                                            st.st_mtime
-                                        ).isoformat(),
+                                        "date": datetime.fromtimestamp(st.st_mtime).isoformat(),
                                         "author_name": "",
                                         "message": "",
                                         "hexsha": "",
@@ -614,9 +612,7 @@ class GitService:
             # (e.g. ~/projects containing skill_dev/.git, blog/.git, …).
             child_repos = self._discover_child_git_repos()
             if child_repos:
-                merged = self._get_recent_files_from_child_repos(
-                    child_repos, limit, extensions
-                )
+                merged = self._get_recent_files_from_child_repos(child_repos, limit, extensions)
                 _recent_files_cache[cache_key] = (time.monotonic(), merged)
                 return merged
 
@@ -677,9 +673,7 @@ class GitService:
             found: list[dict[str, Any]] = []
             repo_root = self.repo_path
             for dirpath, dirnames, filenames in os.walk(dir_path):
-                dirnames[:] = [
-                    d for d in dirnames if not d.startswith(".") and d not in exclude
-                ]
+                dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in exclude]
                 for fname in filenames:
                     if not _matches_ext(fname):
                         continue
