@@ -73,10 +73,12 @@ async def _coalesce_and_broadcast(
 
     # If any pending path is a git state file, invalidate the recent-files
     # cache so the next API call returns fresh data.
-    if any(_is_git_state_change(p) for p in pending):
+    has_git_change = any(_is_git_state_change(p) for p in pending)
+    if has_git_change:
         from vantage.services.git_service import clear_recent_files_cache
 
         clear_recent_files_cache()
+        logger.debug("Cleared recent-files cache due to git state change")
 
     unique_paths = sorted(pending)
     msg: dict[str, object] = {"type": "files_changed", "paths": unique_paths}
@@ -85,6 +87,7 @@ async def _coalesce_and_broadcast(
         logger.info(f"Batch ({repo_name}): {len(unique_paths)} file(s) changed")
     else:
         logger.info(f"Batch: {len(unique_paths)} file(s) changed")
+    logger.debug("Changed paths: %s", unique_paths)
     await manager.broadcast(msg)
 
 

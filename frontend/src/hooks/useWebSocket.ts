@@ -36,6 +36,34 @@ export const useWebSocket = () => {
   }, [currentPath]);
 
   const processBatch = useCallback(() => {
+    const changedPaths = pendingPathsRef.current;
+    if (changedPaths.size === 0) {
+      // Nothing pending — clean up timers
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      if (maxWaitTimerRef.current) {
+        clearTimeout(maxWaitTimerRef.current);
+        maxWaitTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (processingRef.current) {
+      // Still processing previous batch — reschedule instead of dropping
+      console.debug(
+        "[ws] processBatch deferred: previous batch still processing, %d paths pending",
+        changedPaths.size,
+      );
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(processBatch, DEBOUNCE_MS); // eslint-disable-line react-hooks/immutability -- intentional self-reschedule
+      return;
+    }
+
+    // Committed to processing — clear timers
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
@@ -45,9 +73,6 @@ export const useWebSocket = () => {
       maxWaitTimerRef.current = null;
     }
 
-    const changedPaths = pendingPathsRef.current;
-    if (changedPaths.size === 0 || processingRef.current) return;
-
     // Guard: don't fire API calls before the repo store is initialised
     const { reposLoaded, isMultiRepo, currentRepo } =
       useRepoStore.getState();
@@ -56,6 +81,11 @@ export const useWebSocket = () => {
 
     pendingPathsRef.current = new Set();
     processingRef.current = true;
+
+    console.debug(
+      "[ws] Processing batch: %d paths changed",
+      changedPaths.size,
+    );
 
     // Trigger flash animation for changed paths
     markPathsChanged(changedPaths);
@@ -96,6 +126,8 @@ export const useWebSocket = () => {
     if (!reposLoaded) return;
     if (isMultiRepo && !currentRepo) return;
 
+    console.debug("[ws] Refreshing after reconnect");
+
     const path = currentPathRef.current;
     if (path) {
       if (path.toLowerCase().endsWith(".md")) {
@@ -129,6 +161,11 @@ export const useWebSocket = () => {
       }
 
       if (message.type === "files_changed" && message.paths) {
+        console.debug(
+          "[ws] files_changed: %d paths",
+          message.paths.length,
+          message.paths,
+        );
         for (const p of message.paths) {
           pendingPathsRef.current.add(p);
         }

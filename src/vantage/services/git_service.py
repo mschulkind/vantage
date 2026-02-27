@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import os
 import re
 import stat as stat_module
@@ -12,6 +13,8 @@ from typing import Any
 from git import Repo
 
 from vantage.schemas.models import DiffHunk, DiffLine, FileDiff, GitCommit
+
+logger = logging.getLogger(__name__)
 
 # Lightweight TTL cache for recent-files results.  Keyed by
 # (repo_path, limit, extensions_tuple).  Shared across GitService
@@ -27,6 +30,7 @@ def clear_recent_files_cache() -> None:
     switches, etc.) are detected so the next API call returns fresh data.
     """
     _recent_files_cache.clear()
+    logger.debug("Recent-files cache cleared")
 
 
 class GitService:
@@ -593,7 +597,11 @@ class GitService:
         if cached is not None:
             ts, data = cached
             if now - ts < _RECENT_FILES_TTL:
+                logger.debug("Recent-files cache hit (age=%.1fs, items=%d)", now - ts, len(data))
                 return data
+            logger.debug("Recent-files cache expired (age=%.1fs)", now - ts)
+        else:
+            logger.debug("Recent-files cache miss")
 
         exclude = self.exclude_dirs
         ext_lower = tuple(e.lower() for e in extensions)
