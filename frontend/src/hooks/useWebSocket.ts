@@ -5,9 +5,9 @@ import { WebSocketMessage } from "../types";
 import { isStaticMode } from "../lib/staticMode";
 
 // Debounce window: collect all messages within this period, then process once
-const DEBOUNCE_MS = 500;
+const DEBOUNCE_MS = 150;
 // Maximum time before forced processing, even if messages keep arriving
-const MAX_WAIT_MS = 2000;
+const MAX_WAIT_MS = 500;
 // Reconnection delays
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
@@ -92,21 +92,24 @@ export const useWebSocket = () => {
 
     const path = currentPathRef.current;
 
+    // Fire all API calls in parallel rather than sequentially
+    const promises: Promise<unknown>[] = [];
+
     if (path && changedPaths.has(path)) {
-      loadFile(path);
-      fetchStatus(path);
+      promises.push(loadFile(path));
+      promises.push(fetchStatus(path));
     }
 
     if (path && !path.toLowerCase().endsWith(".md")) {
-      viewDirectory(path);
+      promises.push(viewDirectory(path));
     }
 
-    refreshExpandedTree();
-    fetchRecentFiles();
+    promises.push(refreshExpandedTree());
+    promises.push(fetchRecentFiles());
 
-    setTimeout(() => {
+    Promise.all(promises).then(() => {
       processingRef.current = false;
-    }, DEBOUNCE_MS);
+    });
   }, [
     loadFile,
     refreshExpandedTree,

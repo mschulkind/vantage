@@ -113,4 +113,31 @@ def test_get_git_status_no_repo(tmp_path, monkeypatch):
     (tmp_path / "test.md").write_text("hello")
 
     response = client.get("/api/git/status?path=test.md")
-    assert response.status_code == 404
+    assert response.status_code == 200
+    data = response.json()
+    assert data["last_commit"] is None
+    assert data["git_status"] is None
+
+
+def test_jj_info_non_jj_repo(tmp_path, monkeypatch):
+    """Test jj info endpoint on a non-jj repo returns is_jj_repo=False."""
+    from vantage.settings import settings
+
+    monkeypatch.setattr(settings, "target_repo", tmp_path)
+
+    response = client.get("/api/jj/info")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_jj"] is False
+    assert data["working_copy_change_id"] is None
+
+
+def test_jj_log_non_jj_repo(tmp_path, monkeypatch):
+    """Test jj log endpoint on a non-jj repo returns empty list."""
+    from vantage.settings import settings
+
+    monkeypatch.setattr(settings, "target_repo", tmp_path)
+
+    response = client.get("/api/jj/log")
+    assert response.status_code == 200
+    assert response.json() == []

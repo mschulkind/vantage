@@ -20,6 +20,11 @@ export interface GitCommit {
   message: string;
 }
 
+export interface FileStatus {
+  last_commit: GitCommit | null;
+  git_status: string | null; // 'modified' | 'added' | 'deleted' | 'untracked' | null
+}
+
 export interface FileContent {
   path: string;
   content: string;
@@ -62,4 +67,30 @@ export interface FileDiff {
   file_path: string;
   hunks: DiffHunk[];
   raw_diff: string;
+}
+
+// --- jj (Jujutsu) types ---
+
+export interface JJRevision {
+  change_id: string;
+  commit_id: string;
+  description: string;
+  author: string;
+  timestamp: string;
+  bookmarks: string[];
+  is_working_copy: boolean;
+}
+
+export interface JJEvoEntry {
+  commit_id: string;
+  description: string;
+  author: string;
+  timestamp: string;
+  operation: string;
+  hidden: boolean;
+}
+
+export interface JJInfo {
+  is_jj: boolean;
+  working_copy_change_id: string | null;
 }

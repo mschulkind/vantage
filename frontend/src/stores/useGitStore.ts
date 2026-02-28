@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import axios from "axios";
-import { GitCommit, FileDiff, RecentFile } from "../types";
+import { GitCommit, FileDiff, RecentFile, FileStatus } from "../types";
 import { useRepoStore } from "./useRepoStore";
 
 // Helper to get API base path.
@@ -17,6 +17,7 @@ const getApiBase = (): string | null => {
 interface GitState {
   history: GitCommit[];
   latestCommit: GitCommit | null;
+  fileGitStatus: string | null; // 'modified', 'added', 'deleted', 'untracked', or null
   isLoading: boolean;
   diff: FileDiff | null;
   isDiffLoading: boolean;
@@ -29,6 +30,7 @@ interface GitState {
   fetchHistory: (path: string) => Promise<void>;
   fetchStatus: (path: string) => Promise<void>;
   fetchDiff: (path: string, commitSha: string) => Promise<void>;
+  fetchWorkingDiff: (path: string) => Promise<void>;
   closeDiff: () => void;
   fetchRecentFiles: (force?: boolean) => Promise<void>;
   fetchRepoInfo: () => Promise<void>;
@@ -41,6 +43,7 @@ let _recentFilesPromise: Promise<void> | null = null;
 export const useGitStore = create<GitState>((set) => ({
   history: [],
   latestCommit: null,
+  fileGitStatus: null,
   isLoading: false,
   diff: null,
   isDiffLoading: false,
@@ -68,12 +71,15 @@ export const useGitStore = create<GitState>((set) => ({
     const apiBase = getApiBase();
     if (!apiBase) return;
     try {
-      const response = await axios.get<GitCommit>(
+      const response = await axios.get<FileStatus>(
         `${apiBase}/git/status?path=${encodeURIComponent(path)}`,
       );
-      set({ latestCommit: response.data });
+      set({
+        latestCommit: response.data.last_commit,
+        fileGitStatus: response.data.git_status,
+      });
     } catch {
-      set({ latestCommit: null });
+      set({ latestCommit: null, fileGitStatus: null });
     }
   },
 
@@ -84,6 +90,20 @@ export const useGitStore = create<GitState>((set) => ({
     try {
       const response = await axios.get<FileDiff | null>(
         `${apiBase}/git/diff?path=${encodeURIComponent(path)}&commit=${encodeURIComponent(commitSha)}`,
+      );
+      set({ diff: response.data, isDiffLoading: false });
+    } catch {
+      set({ diff: null, isDiffLoading: false });
+    }
+  },
+
+  fetchWorkingDiff: async (path) => {
+    const apiBase = getApiBase();
+    if (!apiBase) return;
+    set({ isDiffLoading: true, showDiff: true });
+    try {
+      const response = await axios.get<FileDiff | null>(
+        `${apiBase}/git/diff/working?path=${encodeURIComponent(path)}`,
       );
       set({ diff: response.data, isDiffLoading: false });
     } catch {

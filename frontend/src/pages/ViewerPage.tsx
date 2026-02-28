@@ -21,6 +21,9 @@ import {
   Loader2,
   Menu,
   X,
+  Code,
+  Copy,
+  Check,
 } from "lucide-react";
 import { RelativeTime } from "../components/RelativeTime";
 import { useNavigate, useParams } from "react-router-dom";
@@ -59,11 +62,13 @@ export const ViewerPage: React.FC = () => {
 
   const {
     latestCommit,
+    fileGitStatus,
     fetchStatus,
     diff,
     showDiff,
     isDiffLoading,
     fetchDiff,
+    fetchWorkingDiff,
     closeDiff,
     recentFiles,
     isRecentLoading,
@@ -81,6 +86,8 @@ export const ViewerPage: React.FC = () => {
   const [recentsModalOpen, setRecentsModalOpen] = useState(false);
   const [allFiles, setAllFiles] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [keyboardShortcutsEnabled, setKeyboardShortcutsEnabled] =
     useState<boolean>(() => {
       try {
@@ -350,7 +357,11 @@ export const ViewerPage: React.FC = () => {
   }, [repoName]);
 
   const handleCommitClick = () => {
-    if (latestCommit && currentPath) {
+    if (!currentPath) return;
+    // For modified files, default to showing uncommitted changes
+    if (fileGitStatus === "modified" || fileGitStatus === "added") {
+      fetchWorkingDiff(currentPath);
+    } else if (latestCommit) {
       fetchDiff(currentPath, latestCommit.hexsha);
     }
   };
@@ -698,10 +709,22 @@ export const ViewerPage: React.FC = () => {
 
           {latestCommit ? (
             <div className="flex items-center space-x-2 shrink-0">
+              {fileGitStatus && (
+                <button
+                  onClick={handleCommitClick}
+                  className="flex items-center space-x-1.5 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors cursor-pointer"
+                  title="View uncommitted changes"
+                >
+                  <GitBranch size={12} />
+                  <span className="font-medium hidden sm:inline">
+                    {fileGitStatus === "modified" ? "Modified" : fileGitStatus === "added" ? "Added" : fileGitStatus === "deleted" ? "Deleted" : fileGitStatus}
+                  </span>
+                </button>
+              )}
               <button
-                onClick={handleCommitClick}
+                onClick={() => latestCommit && currentPath && fetchDiff(currentPath, latestCommit.hexsha)}
                 className="hidden sm:flex items-center space-x-3 text-xs group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 -mx-2 transition-colors"
-                title="Click to view diff"
+                title="Click to view last commit diff"
               >
                 <div className="flex items-center space-x-1.5 text-slate-500 dark:text-slate-400">
                   <Clock size={14} />
@@ -718,7 +741,7 @@ export const ViewerPage: React.FC = () => {
               </button>
               {/* Mobile: just show clock icon as commit button */}
               <button
-                onClick={handleCommitClick}
+                onClick={() => latestCommit && currentPath && fetchDiff(currentPath, latestCommit.hexsha)}
                 className="sm:hidden flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors"
                 title="View diff"
               >
@@ -727,7 +750,7 @@ export const ViewerPage: React.FC = () => {
               </button>
               {currentPath &&
                 currentPath.toLowerCase().endsWith(".md") &&
-                history.length > 1 && (
+                history.length >= 1 && (
                   <AppLink
                     to={
                       isMultiRepo && currentRepo
@@ -743,13 +766,47 @@ export const ViewerPage: React.FC = () => {
                     </span>
                   </AppLink>
                 )}
+              {currentPath && currentPath.toLowerCase().endsWith(".md") && (
+                <button
+                  onClick={() => { setShowRaw((v) => !v); setCopied(false); }}
+                  className={cn(
+                    "flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 transition-colors cursor-pointer",
+                    showRaw
+                      ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30"
+                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                  )}
+                  title={showRaw ? "View rendered" : "View raw markdown"}
+                >
+                  <Code size={14} />
+                  <span className="hidden sm:inline">{showRaw ? "Rendered" : "Raw"}</span>
+                </button>
+              )}
             </div>
           ) : currentPath && currentPath.toLowerCase().endsWith(".md") ? (
-            <div className="flex items-center space-x-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 sm:px-3 py-1.5 rounded-lg shrink-0">
-              <FileQuestion size={14} />
-              <span className="font-medium hidden sm:inline">
-                Untracked file
-              </span>
+            <div className="flex items-center space-x-2 shrink-0">
+              <button
+                onClick={() => currentPath && fetchWorkingDiff(currentPath)}
+                className="flex items-center space-x-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+                title="View file content as diff"
+              >
+                <FileQuestion size={14} />
+                <span className="font-medium hidden sm:inline">
+                  Untracked file
+                </span>
+              </button>
+              <button
+                onClick={() => { setShowRaw((v) => !v); setCopied(false); }}
+                className={cn(
+                  "flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 transition-colors cursor-pointer",
+                  showRaw
+                    ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30"
+                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                )}
+                title={showRaw ? "View rendered" : "View raw markdown"}
+              >
+                <Code size={14} />
+                <span className="hidden sm:inline">{showRaw ? "Rendered" : "Raw"}</span>
+              </button>
             </div>
           ) : null}
         </div>
@@ -797,10 +854,30 @@ export const ViewerPage: React.FC = () => {
                 </div>
               ) : (
               <div className="pb-8">
+                  {showRaw ? (
+                    <div className="relative">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(fileContent.content);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-md transition-colors z-10"
+                        title="Copy to clipboard"
+                      >
+                        {copied ? <Check size={12} /> : <Copy size={12} />}
+                        {copied ? "Copied!" : "Copy"}
+                      </button>
+                      <pre className="p-4 pr-24 text-sm font-mono whitespace-pre-wrap break-words bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-auto max-h-[80vh] text-slate-700 dark:text-slate-300">
+                        {fileContent.content}
+                      </pre>
+                    </div>
+                  ) : (
                   <MarkdownViewer
                     content={fileContent.content}
                     currentPath={fileContent.path}
                   />
+                  )}
                 </div>
               )
             ) : currentDirectory ? (

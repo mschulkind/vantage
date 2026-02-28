@@ -20,9 +20,9 @@ _GIT_STATE_FILES = {"index", "HEAD", "MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_H
 
 # Quiet period: wait this long after last change before broadcasting,
 # to coalesce rapid bursts like git branch switches.
-_QUIET_PERIOD_S = 0.5
+_QUIET_PERIOD_S = 0.1
 # Maximum time before forced broadcast even if changes keep arriving.
-_MAX_WAIT_S = 3.0
+_MAX_WAIT_S = 1.0
 
 
 class _GitAwareFilter(DefaultFilter):

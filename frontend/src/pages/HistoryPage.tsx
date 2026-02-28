@@ -1,6 +1,7 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useGitStore } from "../stores/useGitStore";
+import { useJJStore } from "../stores/useJJStore";
 import { useRepoStore } from "../stores/useRepoStore";
 import { AppLink } from "../components/AppLink";
 import {
@@ -10,6 +11,9 @@ import {
   User,
   MessageSquare,
   ChevronRight,
+  Layers,
+  Bookmark,
+  Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
 import { RelativeTime } from "../components/RelativeTime";
@@ -27,6 +31,7 @@ export const HistoryPage: React.FC = () => {
     isDiffLoading,
     closeDiff,
   } = useGitStore();
+  const jj = useJJStore();
   const {
     isMultiRepo,
     currentRepo,
@@ -35,6 +40,9 @@ export const HistoryPage: React.FC = () => {
     reposLoaded,
     loadRepos,
   } = useRepoStore();
+
+  const [historyMode, setHistoryMode] = useState<"git" | "jj">("git");
+  const [expandedEvolog, setExpandedEvolog] = useState<string | null>(null);
 
   // Parse the file path from the URL
   const getFileInfo = useCallback(() => {
@@ -83,9 +91,45 @@ export const HistoryPage: React.FC = () => {
     }
   }, [filePath, fetchHistory, currentRepo]);
 
+  // Detect jj repo on mount
+  useEffect(() => {
+    jj.fetchInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRepo]);
+
+  // Switch to jj mode when jj is detected
+  useEffect(() => {
+    if (jj.info?.is_jj) {
+      setHistoryMode("jj");
+    }
+  }, [jj.info]);
+
+  // Fetch jj log when in jj mode
+  useEffect(() => {
+    if (historyMode === "jj" && filePath) {
+      jj.fetchLog(filePath);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyMode, filePath, currentRepo]);
+
   const handleCommitClick = (hexsha: string) => {
     if (filePath) {
       fetchDiff(filePath, hexsha);
+    }
+  };
+
+  const handleJJRevClick = (changeId: string) => {
+    if (filePath) {
+      jj.fetchDiff(changeId, filePath);
+    }
+  };
+
+  const handleEvologToggle = (changeId: string) => {
+    if (expandedEvolog === changeId) {
+      setExpandedEvolog(null);
+    } else {
+      setExpandedEvolog(changeId);
+      jj.fetchEvolog(changeId);
     }
   };
 
@@ -110,7 +154,7 @@ export const HistoryPage: React.FC = () => {
               </div>
               <div>
                 <h1 className="font-semibold text-lg text-slate-900 dark:text-slate-100">
-                  Commit History
+                  {historyMode === "jj" ? "Revision History" : "Commit History"}
                 </h1>
                 <nav className="flex items-center text-xs text-slate-500 space-x-1 mt-0.5">
                   {isMultiRepo && currentRepo && (
@@ -143,13 +187,49 @@ export const HistoryPage: React.FC = () => {
                 </nav>
               </div>
             </div>
+            {/* Mode toggle when jj is available */}
+            {jj.info?.is_jj && (
+              <div className="flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
+                <button
+                  onClick={() => setHistoryMode("jj")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                    historyMode === "jj"
+                      ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200",
+                  )}
+                >
+                  jj
+                </button>
+                <button
+                  onClick={() => setHistoryMode("git")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                    historyMode === "git"
+                      ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200",
+                  )}
+                >
+                  Git
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* History List */}
       <div className="max-w-4xl mx-auto px-6 py-8">
-        {isLoading ? (
+        {historyMode === "jj" ? (
+          <JJTimeline
+            revisions={jj.revisions}
+            evolog={jj.evolog}
+            isLoading={jj.isLoading}
+            expandedEvolog={expandedEvolog}
+            onRevClick={handleJJRevClick}
+            onEvologToggle={handleEvologToggle}
+          />
+        ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-slate-200 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin" />
           </div>
@@ -230,7 +310,7 @@ export const HistoryPage: React.FC = () => {
         )}
       </div>
 
-      {/* Diff Viewer Modal - reuse from ViewerPage pattern */}
+      {/* Git Diff Viewer Modal */}
       {showDiff &&
         (isDiffLoading ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -258,17 +338,261 @@ export const HistoryPage: React.FC = () => {
             </div>
           </div>
         ))}
+
+      {/* jj Diff Viewer Modal */}
+      {jj.showDiff &&
+        (jj.isDiffLoading ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-8 flex flex-col items-center">
+              <div className="w-10 h-10 border-4 border-slate-200 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin mb-4" />
+              <p className="text-slate-600 dark:text-slate-300 font-medium">
+                Loading jj diff...
+              </p>
+            </div>
+          </div>
+        ) : jj.diff ? (
+          <DiffViewerModal
+            diff={jj.diff}
+            onClose={() => jj.setShowDiff(false)}
+          />
+        ) : (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-8 flex flex-col items-center">
+              <p className="text-slate-600 dark:text-slate-300 font-medium mb-4">
+                Could not load jj diff
+              </p>
+              <button
+                onClick={() => jj.setShowDiff(false)}
+                className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ))}
     </div>
   );
 };
 
 // Inline DiffViewer modal for the history page (reuse DiffViewer component)
 import { DiffViewer as DiffViewerComponent } from "../components/DiffViewer";
-import { FileDiff } from "../types";
+import { FileDiff, JJRevision, JJEvoEntry } from "../types";
 
 const DiffViewerModal: React.FC<{ diff: FileDiff; onClose: () => void }> = ({
   diff,
   onClose,
 }) => {
   return <DiffViewerComponent diff={diff} onClose={onClose} />;
+};
+
+// jj revision timeline component
+const JJTimeline: React.FC<{
+  revisions: JJRevision[];
+  evolog: JJEvoEntry[];
+  isLoading: boolean;
+  expandedEvolog: string | null;
+  onRevClick: (changeId: string) => void;
+  onEvologToggle: (changeId: string) => void;
+}> = ({
+  revisions,
+  evolog,
+  isLoading,
+  expandedEvolog,
+  onRevClick,
+  onEvologToggle,
+}) => {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-4 border-slate-200 dark:border-slate-600 border-t-violet-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (revisions.length === 0) {
+    return (
+      <div className="text-center py-20 text-slate-400">
+        <Layers size={48} className="mx-auto mb-4 text-slate-300" />
+        <p className="text-lg font-medium text-slate-500">
+          No jj revisions found
+        </p>
+        <p className="text-sm mt-1">
+          This file may not have any jj history yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {/* Timeline line */}
+      <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-violet-200 dark:bg-violet-800" />
+
+      <div className="space-y-1">
+        {revisions.map((rev, index) => (
+          <div key={rev.commit_id} className="relative">
+            <div className="flex items-start group">
+              {/* Timeline dot */}
+              <div
+                className={cn(
+                  "relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1 transition-colors",
+                  rev.is_working_copy
+                    ? "bg-violet-500 text-white ring-2 ring-violet-300 dark:ring-violet-700"
+                    : index === 0
+                      ? "bg-violet-500 text-white"
+                      : "bg-white dark:bg-slate-800 border-2 border-violet-200 dark:border-violet-700 text-violet-400 group-hover:border-violet-400 group-hover:text-violet-600",
+                )}
+              >
+                {rev.is_working_copy ? (
+                  <Pencil size={16} />
+                ) : (
+                  <Layers size={16} />
+                )}
+              </div>
+
+              {/* Revision card */}
+              <div className="ml-4 flex-1">
+                <button
+                  onClick={() => onRevClick(rev.change_id)}
+                  className={cn(
+                    "w-full text-left bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 transition-all cursor-pointer",
+                    "hover:border-violet-200 dark:hover:border-violet-700 hover:shadow-md hover:bg-violet-50/30 dark:hover:bg-violet-900/20",
+                    rev.is_working_copy &&
+                      "border-violet-300 dark:border-violet-600 shadow-sm bg-violet-50/20 dark:bg-violet-900/10",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-1.5">
+                        <MessageSquare
+                          size={14}
+                          className="text-slate-400 shrink-0"
+                        />
+                        <span
+                          className={cn(
+                            "font-medium truncate",
+                            rev.description
+                              ? "text-slate-900 dark:text-slate-100"
+                              : "text-slate-400 dark:text-slate-500 italic",
+                          )}
+                        >
+                          {rev.description || "(no description)"}
+                        </span>
+                      </div>
+                      <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                        <div className="flex items-center space-x-1.5">
+                          <User size={12} />
+                          <span>{rev.author}</span>
+                        </div>
+                        {rev.timestamp && (
+                          <div className="flex items-center space-x-1.5">
+                            <Clock size={12} />
+                            <span
+                              title={format(new Date(rev.timestamp), "PPpp")}
+                            >
+                              <RelativeTime date={rev.timestamp} />
+                            </span>
+                          </div>
+                        )}
+                        {rev.bookmarks.length > 0 && (
+                          <div className="flex items-center space-x-1.5">
+                            <Bookmark size={12} />
+                            <span>
+                              {rev.bookmarks.map((b, i) => (
+                                <span
+                                  key={b}
+                                  className="text-violet-600 dark:text-violet-400"
+                                >
+                                  {i > 0 && ", "}
+                                  {b}
+                                </span>
+                              ))}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="font-mono text-xs text-violet-500 bg-violet-50 dark:bg-violet-900/30 px-2 py-1 rounded-md border border-violet-100 dark:border-violet-800">
+                        {rev.change_id}
+                      </span>
+                      {rev.is_working_copy && (
+                        <span className="text-[10px] uppercase tracking-wider text-violet-600 dark:text-violet-400 font-semibold">
+                          @ working copy
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+
+                {/* Evolution toggle button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEvologToggle(rev.change_id);
+                  }}
+                  className={cn(
+                    "mt-1 ml-2 text-xs flex items-center space-x-1 px-2 py-1 rounded transition-colors",
+                    expandedEvolog === rev.change_id
+                      ? "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30"
+                      : "text-slate-400 hover:text-violet-500 hover:bg-slate-50 dark:hover:bg-slate-800",
+                  )}
+                >
+                  <Layers size={12} />
+                  <span>
+                    {expandedEvolog === rev.change_id
+                      ? "Hide evolution"
+                      : "Show evolution"}
+                  </span>
+                </button>
+
+                {/* Evolog entries */}
+                {expandedEvolog === rev.change_id && evolog.length > 0 && (
+                  <div className="mt-2 ml-4 border-l-2 border-violet-200 dark:border-violet-800 pl-4 space-y-2">
+                    {evolog.map((entry, i) => (
+                      <div
+                        key={`${entry.commit_id}-${i}`}
+                        className={cn(
+                          "bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 text-sm",
+                          entry.hidden && "opacity-50",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-slate-700 dark:text-slate-300 truncate">
+                              {entry.description || "(no description)"}
+                            </p>
+                            {entry.operation && (
+                              <p className="text-xs text-slate-500 mt-1 font-mono">
+                                {entry.operation}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-0.5 text-xs text-slate-400 shrink-0">
+                            <span className="font-mono">
+                              {entry.commit_id.slice(0, 12)}
+                            </span>
+                            {entry.hidden && (
+                              <span className="text-amber-500 text-[10px]">
+                                hidden
+                              </span>
+                            )}
+                            {entry.timestamp && (
+                              <span>
+                                <RelativeTime date={entry.timestamp} />
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
