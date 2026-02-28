@@ -79,6 +79,8 @@ const DiffLineComponent: React.FC<{ line: DiffLine }> = ({ line }) => {
 };
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
+  const isWorkingDiff = diff.commit_hexsha === "working";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col mx-4 overflow-hidden">
@@ -86,16 +88,23 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
           <div className="flex flex-col space-y-2">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center",
+                isWorkingDiff
+                  ? "bg-gradient-to-br from-green-500 to-emerald-600"
+                  : "bg-gradient-to-br from-amber-500 to-orange-600",
+              )}>
                 <GitCommitIcon size={16} className="text-white" />
               </div>
               <div>
                 <h2 className="font-semibold text-slate-900 dark:text-slate-100">
-                  Commit Diff
+                  {isWorkingDiff ? "Uncommitted Changes" : "Commit Diff"}
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                  {diff.commit_hexsha.slice(0, 8)}
-                </p>
+                {!isWorkingDiff && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                    {diff.commit_hexsha.slice(0, 8)}
+                  </p>
+                )}
               </div>
             </div>
             <p className="text-sm text-slate-700 dark:text-slate-300 font-medium pl-11">

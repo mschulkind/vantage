@@ -7,16 +7,18 @@ Instructions for building, testing, and contributing to Vantage.
 ```
 src/vantage/          Python backend (FastAPI)
   routers/            HTTP/WebSocket route handlers
-  services/           Business logic (filesystem, git, watcher)
+  services/           Business logic (filesystem, git, jj, watcher)
   schemas/            Pydantic data models
 frontend/             React frontend (Vite + TypeScript)
   src/components/     UI components
-  src/stores/         Zustand state management
+  src/stores/         Zustand state management (git, jj, repo)
   src/hooks/          Custom React hooks
   src/pages/          Page-level components
 tests/                Backend tests (pytest)
 frontend/e2e/         End-to-end tests (Playwright)
 docs/                 Documentation
+  design/             Architecture and design decisions
+  research/           Research notes (jj CLI reference, etc.)
 ```
 
 ## Prerequisites
@@ -116,3 +118,6 @@ just deploy           # Build, install, and restart the systemd service
 ## Additional Docs
 
 - [docs/design/technical_spec.md](design/technical_spec.md) — Architecture and design decisions
+- [docs/design/jj-history-viewer.md](design/jj-history-viewer.md) — jj (Jujutsu) history & evolution viewer
+- [docs/design/working-directory-diffs.md](design/working-directory-diffs.md) — Uncommitted change viewing
+- [docs/research/jj-cli.md](research/jj-cli.md) — jj CLI reference and integration notes

@@ -909,8 +909,10 @@ class GitService:
                 # Get diff between parent and this commit for the specific file
                 diffs = parent.diff(commit, paths=repo_path, create_patch=True)
             else:
-                # First commit - diff against empty tree
-                diffs = commit.diff(None, paths=repo_path, create_patch=True, R=True)
+                # First commit - diff against empty tree using NULL_TREE
+                from git import NULL_TREE
+
+                diffs = commit.diff(NULL_TREE, paths=repo_path, create_patch=True)
 
             if not diffs:
                 return None
@@ -932,6 +934,71 @@ class GitService:
             )
         except Exception:
             return None
+
+    def get_working_dir_diff(self, path: str) -> FileDiff | None:
+        """Get the uncommitted diff for a file (working directory vs HEAD).
+
+        For tracked+modified files, shows the diff against the last committed
+        version. For untracked files, shows the entire file as additions.
+        """
+        if not self.repo or not self.repo.working_dir:
+            child = self._resolve_child_repo(path) if not self.repo else None
+            if child:
+                return child[0].get_working_dir_diff(child[1])
+            return None
+
+        try:
+            repo_path = self._get_repo_relative_path(path)
+            status = self.get_working_dir_status()
+            file_status = status.get(path)
+
+            if not file_status:
+                logger.debug("get_working_dir_diff: no working dir changes for %s", path)
+                return None
+
+            # Use git diff for tracked files, or show full content for untracked
+            if file_status == "untracked":
+                raw_diff = self._diff_untracked_file(path)
+            else:
+                proc = subprocess.run(
+                    ["git", "diff", "HEAD", "--", str(repo_path)],
+                    capture_output=True,
+                    text=True,
+                    cwd=self.repo.working_dir,
+                    timeout=10,
+                )
+                raw_diff = proc.stdout if proc.returncode == 0 else ""
+
+            if not raw_diff:
+                return None
+
+            hunks = self._parse_diff(raw_diff)
+
+            return FileDiff(
+                commit_hexsha="working",
+                commit_message=f"Uncommitted changes ({file_status})",
+                commit_author="Working directory",
+                commit_date=datetime.now(),
+                file_path=path,
+                hunks=hunks,
+                raw_diff=raw_diff,
+            )
+        except Exception:
+            logger.exception("Error getting working dir diff for %s", path)
+            return None
+
+    def _diff_untracked_file(self, path: str) -> str:
+        """Generate a diff-like output for an untracked file (all additions)."""
+        full_path = Path(self.repo_path) / path
+        try:
+            content = full_path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            return ""
+
+        lines = content.splitlines()
+        diff_lines = [f"@@ -0,0 +1,{len(lines)} @@"]
+        diff_lines.extend(f"+{line}" for line in lines)
+        return "\n".join(diff_lines)
 
     def _parse_diff(self, raw_diff: str) -> list[DiffHunk]:
         """Parse a unified diff into hunks with line information."""

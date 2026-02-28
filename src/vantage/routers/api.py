@@ -1,8 +1,20 @@
 from fastapi import APIRouter, HTTPException
 
-from vantage.schemas.models import FileContent, FileDiff, FileNode, GitCommit, RepoInfo, VersionInfo
+from vantage.schemas.models import (
+    FileContent,
+    FileDiff,
+    FileNode,
+    FileStatus,
+    GitCommit,
+    JJEvoEntry,
+    JJInfo,
+    JJRevision,
+    RepoInfo,
+    VersionInfo,
+)
 from vantage.services.fs_service import FileSystemService
 from vantage.services.git_service import GitService
+from vantage.services.jj_service import JJService
 from vantage.settings import get_daemon_config, settings
 
 router = APIRouter()
@@ -54,6 +66,24 @@ def get_git_service(repo: str | None = None):
             raise HTTPException(status_code=404, detail=f"Repository not found: {repo}")
         return GitService(repo_config.path, exclude_dirs=settings.exclude_dirs)
     return GitService(settings.target_repo, exclude_dirs=settings.exclude_dirs)
+
+
+def get_jj_service(repo: str | None = None) -> JJService:
+    """Get JJService for the specified repo or default."""
+    from pathlib import Path
+
+    daemon_config = get_daemon_config()
+    if daemon_config:
+        if not repo:
+            raise HTTPException(
+                status_code=400,
+                detail="Repository name is required in multi-repo mode",
+            )
+        repo_config = daemon_config.get_repo(repo)
+        if not repo_config:
+            raise HTTPException(status_code=404, detail=f"Repository not found: {repo}")
+        return JJService(Path(repo_config.path))
+    return JJService(Path(settings.target_repo))
 
 
 @router.get("/health")
@@ -109,13 +139,12 @@ async def get_history_multi(repo: str, path: str):
     return git.get_history(path)
 
 
-@router.get("/r/{repo}/git/status", response_model=GitCommit)
+@router.get("/r/{repo}/git/status", response_model=FileStatus)
 async def get_status_multi(repo: str, path: str):
     git = get_git_service(repo)
     commit = git.get_last_commit(path)
-    if not commit:
-        raise HTTPException(status_code=404, detail="No commit found for path")
-    return commit
+    wd_status = git.get_working_dir_status()
+    return FileStatus(last_commit=commit, git_status=wd_status.get(path))
 
 
 def _validate_commit_sha(sha: str) -> None:
@@ -133,6 +162,15 @@ async def get_diff_multi(repo: str, path: str, commit: str):
     diff = git.get_file_diff(path, commit)
     if not diff:
         raise HTTPException(status_code=404, detail="Could not generate diff")
+    return diff
+
+
+@router.get("/r/{repo}/git/diff/working", response_model=FileDiff)
+async def get_working_diff_multi(repo: str, path: str):
+    git = get_git_service(repo)
+    diff = git.get_working_dir_diff(path)
+    if not diff:
+        raise HTTPException(status_code=404, detail="No uncommitted changes for this file")
     return diff
 
 
@@ -208,14 +246,13 @@ async def get_history(path: str):
     return git.get_history(path)
 
 
-@router.get("/git/status", response_model=GitCommit)
+@router.get("/git/status", response_model=FileStatus)
 async def get_status(path: str):
     _require_single_repo_mode()
     git = get_git_service()
     commit = git.get_last_commit(path)
-    if not commit:
-        raise HTTPException(status_code=404, detail="No commit found for path")
-    return commit
+    wd_status = git.get_working_dir_status()
+    return FileStatus(last_commit=commit, git_status=wd_status.get(path))
 
 
 @router.get("/git/diff", response_model=FileDiff)
@@ -226,6 +263,16 @@ async def get_diff(path: str, commit: str):
     diff = git.get_file_diff(path, commit)
     if not diff:
         raise HTTPException(status_code=404, detail="Could not generate diff")
+    return diff
+
+
+@router.get("/git/diff/working", response_model=FileDiff)
+async def get_working_diff(path: str):
+    _require_single_repo_mode()
+    git = get_git_service()
+    diff = git.get_working_dir_diff(path)
+    if not diff:
+        raise HTTPException(status_code=404, detail="No uncommitted changes for this file")
     return diff
 
 
@@ -249,3 +296,64 @@ async def list_all_files():
     _require_single_repo_mode()
     fs = get_fs_service()
     return fs.list_all_files()
+
+
+# --- jj (Jujutsu) endpoints ---
+
+
+@router.get("/r/{repo}/jj/info", response_model=JJInfo)
+async def get_jj_info_multi(repo: str):
+    jj = get_jj_service(repo)
+    return jj.get_info()
+
+
+@router.get("/r/{repo}/jj/log", response_model=list[JJRevision])
+async def get_jj_log_multi(repo: str, path: str | None = None, limit: int = 50):
+    jj = get_jj_service(repo)
+    return jj.get_log(path=path, limit=min(max(limit, 1), 200))
+
+
+@router.get("/r/{repo}/jj/evolog", response_model=list[JJEvoEntry])
+async def get_jj_evolog_multi(repo: str, rev: str = "@", limit: int = 20):
+    jj = get_jj_service(repo)
+    return jj.get_evolog(rev=rev, limit=min(max(limit, 1), 100))
+
+
+@router.get("/r/{repo}/jj/diff", response_model=FileDiff)
+async def get_jj_diff_multi(repo: str, rev: str, path: str | None = None):
+    jj = get_jj_service(repo)
+    diff = jj.get_diff(rev=rev, path=path)
+    if not diff:
+        raise HTTPException(status_code=404, detail="Could not generate jj diff")
+    return diff
+
+
+@router.get("/jj/info", response_model=JJInfo)
+async def get_jj_info():
+    _require_single_repo_mode()
+    jj = get_jj_service()
+    return jj.get_info()
+
+
+@router.get("/jj/log", response_model=list[JJRevision])
+async def get_jj_log(path: str | None = None, limit: int = 50):
+    _require_single_repo_mode()
+    jj = get_jj_service()
+    return jj.get_log(path=path, limit=min(max(limit, 1), 200))
+
+
+@router.get("/jj/evolog", response_model=list[JJEvoEntry])
+async def get_jj_evolog(rev: str = "@", limit: int = 20):
+    _require_single_repo_mode()
+    jj = get_jj_service()
+    return jj.get_evolog(rev=rev, limit=min(max(limit, 1), 100))
+
+
+@router.get("/jj/diff", response_model=FileDiff)
+async def get_jj_diff(rev: str, path: str | None = None):
+    _require_single_repo_mode()
+    jj = get_jj_service()
+    diff = jj.get_diff(rev=rev, path=path)
+    if not diff:
+        raise HTTPException(status_code=404, detail="Could not generate jj diff")
+    return diff

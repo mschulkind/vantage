@@ -52,7 +52,7 @@ describe("useGitStore", () => {
   });
 
   describe("fetchStatus", () => {
-    it("fetches and stores latest commit", async () => {
+    it("fetches and stores latest commit and git status", async () => {
       const mockCommit = {
         hexsha: "abc123",
         author_name: "Test Author",
@@ -60,7 +60,11 @@ describe("useGitStore", () => {
         date: "2024-01-01T00:00:00Z",
         message: "Test commit",
       };
-      mockedAxios.get.mockResolvedValueOnce({ data: mockCommit });
+      const mockResponse = {
+        last_commit: mockCommit,
+        git_status: "modified",
+      };
+      mockedAxios.get.mockResolvedValueOnce({ data: mockResponse });
 
       await useGitStore.getState().fetchStatus("test.md");
 
@@ -68,6 +72,7 @@ describe("useGitStore", () => {
         "/api/git/status?path=test.md",
       );
       expect(useGitStore.getState().latestCommit).toEqual(mockCommit);
+      expect(useGitStore.getState().fileGitStatus).toBe("modified");
     });
 
     it("handles fetch error by setting latestCommit to null", async () => {
@@ -76,6 +81,7 @@ describe("useGitStore", () => {
       await useGitStore.getState().fetchStatus("test.md");
 
       expect(useGitStore.getState().latestCommit).toBeNull();
+      expect(useGitStore.getState().fileGitStatus).toBeNull();
     });
   });
 

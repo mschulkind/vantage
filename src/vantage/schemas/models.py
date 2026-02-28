@@ -30,7 +30,7 @@ class GitCommit(BaseModel):
 
 class FileStatus(BaseModel):
     last_commit: GitCommit | None = None
-    is_modified: bool
+    git_status: str | None = None  # 'modified', 'added', 'deleted', 'untracked', or None (clean)
 
 
 class FileContent(BaseModel):
@@ -66,3 +66,33 @@ class VersionInfo(BaseModel):
 
     commit_hash: str
     is_dirty: bool
+
+
+class JJRevision(BaseModel):
+    """A jj revision (change)."""
+
+    change_id: str  # Short change ID (e.g., "wosnyxlu")
+    commit_id: str  # Full commit hash
+    description: str
+    author: str
+    timestamp: datetime
+    bookmarks: list[str] = []
+    is_working_copy: bool = False
+
+
+class JJEvoEntry(BaseModel):
+    """An entry in a jj evolution log (evolog)."""
+
+    commit_id: str
+    description: str
+    author: str
+    timestamp: datetime
+    operation: str  # What operation caused this evolution
+    hidden: bool = False
+
+
+class JJInfo(BaseModel):
+    """Information about jj status in a repository."""
+
+    is_jj: bool
+    working_copy_change_id: str | None = None

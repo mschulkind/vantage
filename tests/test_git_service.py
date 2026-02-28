@@ -128,6 +128,24 @@ def test_get_file_diff(git_repo):
     assert len(diff.hunks) > 0
 
 
+def test_get_file_diff_initial_commit(git_repo):
+    """Test getting a diff for the initial commit (no parent)."""
+    service = GitService(git_repo)
+
+    # Get the initial commit hash (oldest)
+    history = service.get_history("README.md", limit=10)
+    initial_sha = history[-1].hexsha
+    assert history[-1].message == "Initial commit"
+
+    diff = service.get_file_diff("README.md", initial_sha)
+
+    assert diff is not None
+    assert diff.commit_hexsha == initial_sha
+    assert diff.commit_message == "Initial commit"
+    assert diff.file_path == "README.md"
+    assert len(diff.hunks) > 0
+
+
 def test_get_file_diff_no_repo(tmp_path):
     """Test getting a diff when not in a repo."""
     service = GitService(tmp_path)

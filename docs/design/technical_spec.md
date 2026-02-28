@@ -48,7 +48,7 @@ We use Pydantic models for type-safe communication.
   ```python
   class FileStatus(BaseModel):
       last_commit: GitCommit | None
-      is_modified: bool
+      git_status: str | None  # 'modified', 'added', 'deleted', 'untracked', or None
   ```
 - `FileContent`: The content of a file.
   ```python
@@ -56,6 +56,33 @@ We use Pydantic models for type-safe communication.
       path: str
       content: str  # Raw text or base64 if binary
       encoding: str # 'utf-8' or 'base64'
+  ```
+- `JJRevision`: A Jujutsu revision (change).
+  ```python
+  class JJRevision(BaseModel):
+      change_id: str          # Short change ID (e.g., "wosnyxlu")
+      commit_id: str          # Commit hash (12 chars)
+      description: str
+      author: str
+      timestamp: datetime
+      bookmarks: list[str]
+      is_working_copy: bool
+  ```
+- `JJEvoEntry`: An entry in a jj evolution log.
+  ```python
+  class JJEvoEntry(BaseModel):
+      commit_id: str
+      description: str
+      author: str
+      timestamp: datetime
+      operation: str          # What jj operation caused this entry
+      hidden: bool
+  ```
+- `JJInfo`: jj repository detection info.
+  ```python
+  class JJInfo(BaseModel):
+      is_jj: bool
+      working_copy_change_id: str | None
   ```
 
 ### 2.2 Configuration
@@ -84,6 +111,19 @@ Configuration is managed via `pydantic-settings` in `src/settings.py`.
     - `get_history(path: str, limit: int = 10) -> List[GitCommit]`: Log for a file.
     - `get_last_commit(path: str) -> GitCommit`: Optimize for just the latest info.
     - `get_repository_root() -> str`: Find `.git` folder.
+    - `get_working_dir_diff(path: str) -> FileDiff | None`: Get uncommitted diff for a file. Uses `git diff HEAD` for tracked files, generates synthetic all-add diffs for untracked files.
+    - `get_git_status() -> dict`: Run `git status --porcelain` and parse results.
+
+- **`JJService` (`jj_service.py`)**
+
+  - **Responsibility:** Wrapping the `jj` CLI for Jujutsu VCS support.
+  - **Design:** Subprocess-based (calls `jj` CLI with `--no-pager`). Uses custom templates with Unicode separator (`␞`) for machine-parseable output. Gracefully returns empty/None when repo is not a jj repo.
+  - **Methods:**
+    - `get_info() -> JJInfo`: Detect if repo uses jj, get working copy change ID.
+    - `get_log(path?, limit) -> list[JJRevision]`: Revision log with custom template.
+    - `get_evolog(rev, limit) -> list[JJEvoEntry]`: Evolution log showing how a change evolved over time (squashes, rebases, description changes).
+    - `get_diff(rev, path?) -> FileDiff | None`: Git-format diff for a revision.
+    - `get_interdiff(from_rev, to_rev, path?) -> FileDiff | None`: Diff between two revisions.
 
 - **`WatcherService` (`watcher.py`)**
 
@@ -103,7 +143,13 @@ Configuration is managed via `pydantic-settings` in `src/settings.py`.
   - `GET /api/tree`: Calls `FileSystemService.list_directory`.
   - `GET /api/content`: Calls `FileSystemService.read_file`.
   - `GET /api/git/history`: Calls `GitService.get_history`.
-  - `GET /api/git/status`: Calls `GitService.get_last_commit`.
+  - `GET /api/git/status`: Returns `FileStatus` (last commit + git working tree status).
+  - `GET /api/git/diff/working?path=`: Returns uncommitted diff for a file.
+  - `GET /api/jj/info`: Returns `JJInfo` (jj detection + working copy ID).
+  - `GET /api/jj/log?path=&limit=`: Returns `list[JJRevision]`.
+  - `GET /api/jj/evolog?rev=&limit=`: Returns `list[JJEvoEntry]`.
+  - `GET /api/jj/diff?rev=&path=`: Returns `FileDiff` for a jj revision.
+  - All endpoints above also exist under `/api/r/{repo}/...` for multi-repo mode.
 - **`socket.py`**:
   - `WS /api/ws`: Handshake -> Add to `ConnectionManager` -> Await disconnect.
 
@@ -125,8 +171,19 @@ We will use `zustand` for cleaner state management than React Context.
 - **`useGitStore`**
   - `history`: GitCommit[]
   - `latestCommit`: GitCommit | null
+  - `fileGitStatus`: string | null (e.g., 'modified', 'added', 'untracked')
   - `isLoading`: boolean
   - `fetchHistory(path)`: Load history for current file.
+  - `fetchWorkingDiff(path)`: Fetch uncommitted diff for a file.
+- **`useJJStore`**
+  - `info`: JJInfo | null
+  - `revisions`: JJRevision[]
+  - `evolog`: JJEvoEntry[]
+  - `diff`: FileDiff | null
+  - `fetchInfo()`: Detect jj repo and get working copy info.
+  - `fetchLog(path?, limit?)`: Load jj revision log.
+  - `fetchEvolog(rev?, limit?)`: Load evolution log for a revision.
+  - `fetchDiff(rev, path?)`: Load diff for a jj revision.
 
 ### 3.2 Component Architecture (`frontend/src/components/`)
 
