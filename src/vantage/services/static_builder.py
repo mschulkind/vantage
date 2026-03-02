@@ -24,7 +24,6 @@ class StaticSiteBuilder:
         output_path: Path,
         frontend_dist: Path | None = None,
         repo_name: str | None = None,
-        base_path: str = "/",
     ):
         """Initialize the static site builder.
 
@@ -33,16 +32,11 @@ class StaticSiteBuilder:
             output_path: Path where the static site will be generated.
             frontend_dist: Optional path to pre-built frontend dist.
             repo_name: Optional name for the repo (defaults to directory name).
-            base_path: Base URL path for deployment (e.g. '/docs/').
         """
         self.source_path = source_path.resolve()
         self.output_path = output_path.resolve()
         self.frontend_dist = frontend_dist
         self.repo_name = repo_name or self.source_path.name
-        # Ensure base_path has leading and trailing slashes
-        self.base_path = base_path if base_path.startswith("/") else f"/{base_path}"
-        if not self.base_path.endswith("/"):
-            self.base_path += "/"
         self.fs_service = FileSystemService(source_path)
         self.git_service = GitService(source_path)
 
@@ -72,15 +66,27 @@ class StaticSiteBuilder:
         """Copy or build the frontend assets."""
         frontend_src = self.frontend_dist
         if frontend_src is None:
-            # Try to find and build frontend
-            frontend_dir = Path(__file__).parent.parent.parent.parent.parent / "frontend"
-            if not frontend_dir.exists():
-                raise ValueError(f"Frontend directory not found: {frontend_dir}")
+            # 1. Try bundled frontend_dist (installed package)
+            bundled = Path(__file__).parent.parent / "frontend_dist"
+            if bundled.exists() and (bundled / "index.html").exists():
+                frontend_src = bundled
+            else:
+                # 2. Try source tree (development)
+                # static_builder.py → services/ → vantage/ → src/ → project root
+                project_root = Path(__file__).parent.parent.parent.parent
+                frontend_dir = project_root / "frontend"
+                if not frontend_dir.exists():
+                    raise ValueError(
+                        f"Frontend not found. Looked in:\n"
+                        f"  Bundled: {bundled}\n"
+                        f"  Source:  {frontend_dir}\n"
+                        f"Provide --frontend-dist explicitly."
+                    )
 
-            print("Building frontend...")
-            subprocess.run(["npm", "install"], cwd=frontend_dir, check=True)
-            subprocess.run(["npm", "run", "build"], cwd=frontend_dir, check=True)
-            frontend_src = frontend_dir / "dist"
+                print("Building frontend...")
+                subprocess.run(["npm", "install"], cwd=frontend_dir, check=True)
+                subprocess.run(["npm", "run", "build"], cwd=frontend_dir, check=True)
+                frontend_src = frontend_dir / "dist"
 
         if not frontend_src.exists():
             raise ValueError(f"Frontend dist not found: {frontend_src}")
@@ -286,7 +292,6 @@ def build_static_site(
     output: Path,
     frontend_dist: Path | None = None,
     repo_name: str | None = None,
-    base_path: str = "/",
 ) -> None:
     """Build a static site from a markdown repository.
 
@@ -295,7 +300,6 @@ def build_static_site(
         output: Path to the output directory.
         frontend_dist: Optional path to pre-built frontend dist.
         repo_name: Optional name for the repo.
-        base_path: Base URL path for deployment (e.g. '/docs/').
     """
-    builder = StaticSiteBuilder(source, output, frontend_dist, repo_name, base_path=base_path)
+    builder = StaticSiteBuilder(source, output, frontend_dist, repo_name)
     builder.build()

@@ -277,13 +277,7 @@ WantedBy=default.target
     default=None,
     help="Name for the repository (defaults to directory name)",
 )
-@click.option(
-    "--base-path",
-    type=str,
-    default="/",
-    help="Base URL path for the deployed site (e.g. /docs/ if hosted at example.com/docs/)",
-)
-def build(repo_path: str, output: str, frontend_dist: str | None, name: str | None, base_path: str):
+def build(repo_path: str, output: str, frontend_dist: str | None, name: str | None):
     """Build a static site from a markdown repository.
 
     This generates a fully self-contained static site with pre-rendered
@@ -293,6 +287,12 @@ def build(repo_path: str, output: str, frontend_dist: str | None, name: str | No
     All Markdown content, git history, diffs, and file metadata are
     pre-generated as JSON files. The frontend detects static mode
     automatically and reads from these files instead of a live API.
+
+    You can run this from any directory — just point REPO_PATH at the
+    directory containing your markdown files:
+
+    \b
+        vantage build ~/projects/my-docs -o ~/output/static-site
     """
     from vantage.services.static_builder import build_static_site
 
@@ -300,12 +300,15 @@ def build(repo_path: str, output: str, frontend_dist: str | None, name: str | No
     output_path = Path(output).resolve()
     frontend_path = Path(frontend_dist).resolve() if frontend_dist else None
 
-    build_static_site(source, output_path, frontend_path, repo_name=name, base_path=base_path)
+    build_static_site(source, output_path, frontend_path, repo_name=name)
 
     click.echo("\nStatic site built successfully!")
     click.echo(f"Output: {output_path}")
     click.echo("\nTo preview locally:")
     click.echo(f"  cd {output_path} && python -m http.server 8080")
+    click.echo("\nTo deploy to S3:")
+    click.echo(f"  aws s3 sync {output_path} s3://your-bucket/path/")
+    click.echo("  Note: Navigate to .../index.html (S3 does not auto-serve index.html for subdirs)")
     click.echo("\nTo deploy to Cloudflare Pages:")
     click.echo(f"  npx wrangler pages deploy {output_path}")
 
