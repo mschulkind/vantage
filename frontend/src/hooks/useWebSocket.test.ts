@@ -232,4 +232,69 @@ describe("useWebSocket", () => {
     // WebSocket constructor called again (initial + reconnect)
     expect(global.WebSocket).toHaveBeenCalledTimes(2);
   });
+
+  describe("reconnect on visibility change", () => {
+    it("force-reconnects after being hidden for more than 30s", () => {
+      renderHook(() => useWebSocket());
+      const initialCalls = (global.WebSocket as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      // Simulate tab hidden
+      act(() => {
+        vi.setSystemTime(Date.now());
+        Object.defineProperty(document, "visibilityState", {
+          value: "hidden",
+          configurable: true,
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      // Advance time by 31 seconds
+      act(() => {
+        vi.advanceTimersByTime(31_000);
+      });
+
+      // Simulate tab visible again
+      act(() => {
+        Object.defineProperty(document, "visibilityState", {
+          value: "visible",
+          configurable: true,
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      // Should have created a new WebSocket (force reconnect)
+      expect(global.WebSocket).toHaveBeenCalledTimes(initialCalls + 1);
+    });
+
+    it("does not force-reconnect when tab was hidden for less than 30s", () => {
+      renderHook(() => useWebSocket());
+
+      // Mark socket as open/healthy
+      mockWebSocket.readyState = WebSocket.OPEN;
+      const initialCalls = (global.WebSocket as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      act(() => {
+        Object.defineProperty(document, "visibilityState", {
+          value: "hidden",
+          configurable: true,
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+
+      act(() => {
+        Object.defineProperty(document, "visibilityState", {
+          value: "visible",
+          configurable: true,
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      // Socket appeared healthy and hidden time < 30s — no extra reconnect
+      expect(global.WebSocket).toHaveBeenCalledTimes(initialCalls);
+    });
+  });
 });
