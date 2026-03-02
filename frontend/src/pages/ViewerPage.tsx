@@ -24,9 +24,10 @@ import {
   Code,
   Copy,
   Check,
+  Github,
 } from "lucide-react";
 import { RelativeTime } from "../components/RelativeTime";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { isStaticMode } from "../lib/staticMode";
 import axios from "axios";
@@ -38,6 +39,21 @@ import {
 } from "../components/KeyboardShortcuts";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { RecentsModal } from "../components/RecentsModal";
+
+/** Format an ISO date string as a short local datetime (e.g. "Mar 2, 2026 3:45 PM"). */
+function formatDateTime(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return dateStr;
+  }
+}
 
 export const ViewerPage: React.FC = () => {
   const {
@@ -80,6 +96,7 @@ export const ViewerPage: React.FC = () => {
     fetchHistory,
   } = useGitStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const { "*": pathParam } = useParams();
   const contentRef = useRef<HTMLDivElement>(null);
   const prevPathRef = useRef<string | null>(null);
@@ -99,6 +116,13 @@ export const ViewerPage: React.FC = () => {
     });
   const { isLoading } = useRepoStore();
   const recentlyChangedPaths = useRepoStore((s) => s.recentlyChangedPaths);
+
+  // Fallback modification date from recent files when no git commit exists
+  const fileMtime = React.useMemo(() => {
+    if (latestCommit || !currentPath) return null;
+    const match = recentFiles.find((f) => f.path === currentPath);
+    return match?.date ?? null;
+  }, [latestCommit, currentPath, recentFiles]);
 
   useWebSocket();
 
@@ -328,10 +352,12 @@ export const ViewerPage: React.FC = () => {
     }
 
     // Navigated to a different file
-    const hash = window.location.hash.slice(1);
-    if (hash) {
+    // Use React Router's location.hash (works with both BrowserRouter and HashRouter).
+    // window.location.hash includes the route path in HashRouter, which is always truthy.
+    const anchor = location.hash ? location.hash.slice(1) : "";
+    if (anchor) {
       requestAnimationFrame(() => {
-        const el = document.getElementById(hash);
+        const el = document.getElementById(anchor);
         if (el && contentRef.current?.scrollTo) {
           const offset =
             el.getBoundingClientRect().top -
@@ -343,7 +369,7 @@ export const ViewerPage: React.FC = () => {
     } else if (contentRef.current.scrollTo) {
       contentRef.current.scrollTo(0, 0);
     }
-  }, [fileContent]);
+  }, [fileContent, location.hash]);
 
   // Fetch recent files and repo info when repo is set (or on mount for single-repo)
   useEffect(() => {
@@ -544,6 +570,15 @@ export const ViewerPage: React.FC = () => {
             </AppLink>
           </div>
           <div className="flex items-center gap-1">
+            <a
+              href="https://github.com/mschulkind/vantage"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              title="View on GitHub"
+            >
+              <Github size={16} />
+            </a>
             <KeyboardShortcutsButton onClick={() => setShortcutsOpen(true)} />
             <SettingsDropdown
               showEmptyDirs={showEmptyDirs}
@@ -740,12 +775,16 @@ export const ViewerPage: React.FC = () => {
               <button
                 onClick={() => latestCommit && currentPath && fetchDiff(currentPath, latestCommit.hexsha)}
                 className="hidden sm:flex items-center space-x-3 text-xs group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 -mx-2 transition-colors"
-                title="Click to view last commit diff"
+                title={`${formatDateTime(latestCommit.date)} — click to view diff`}
               >
                 <div className="flex items-center space-x-1.5 text-slate-500 dark:text-slate-400">
                   <Clock size={14} />
                   <span>
                     <RelativeTime date={latestCommit.date} />
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
+                  <span className="text-slate-400 dark:text-slate-500">
+                    {formatDateTime(latestCommit.date)}
                   </span>
                 </div>
                 <div className="flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 group-hover:bg-slate-200 dark:group-hover:bg-slate-600 px-2.5 py-1.5 rounded-md transition-colors">
@@ -800,16 +839,29 @@ export const ViewerPage: React.FC = () => {
             </div>
           ) : currentPath && currentPath.toLowerCase().endsWith(".md") ? (
             <div className="flex items-center space-x-2 shrink-0">
-              <button
-                onClick={() => currentPath && fetchWorkingDiff(currentPath)}
-                className="flex items-center space-x-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
-                title="View file content as diff"
-              >
-                <FileQuestion size={14} />
-                <span className="font-medium hidden sm:inline">
-                  Untracked file
-                </span>
-              </button>
+              {!isStaticMode() && (
+                <button
+                  onClick={() => currentPath && fetchWorkingDiff(currentPath)}
+                  className="flex items-center space-x-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+                  title="View file content as diff"
+                >
+                  <FileQuestion size={14} />
+                  <span className="font-medium hidden sm:inline">
+                    Untracked file
+                  </span>
+                </button>
+              )}
+              {fileMtime && (
+                <div
+                  className="hidden sm:flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 px-2 py-1.5"
+                  title={formatDateTime(fileMtime)}
+                >
+                  <Clock size={14} />
+                  <span><RelativeTime date={fileMtime} /></span>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
+                  <span className="text-slate-400 dark:text-slate-500">{formatDateTime(fileMtime)}</span>
+                </div>
+              )}
               <button
                 onClick={() => { setShowRaw((v) => !v); setCopied(false); }}
                 className={cn(
