@@ -219,7 +219,7 @@ class StaticSiteBuilder:
                     print(f"Warning: Could not generate diff for {file_path}@{commit.hexsha}: {e}")
 
     def _inject_static_mode(self) -> None:
-        """Inject static mode flag and rewrite asset paths for the deploy base path."""
+        """Inject static mode flag and rewrite asset paths to relative."""
         import re
 
         index_html = self.output_path / "index.html"
@@ -229,27 +229,28 @@ class StaticSiteBuilder:
         content = index_html.read_text()
 
         # Inject static mode script tag
-        static_script = f'<script>window.__VANTAGE_STATIC__=true;window.__VANTAGE_BASE_PATH__="{self.base_path}";</script>'
+        static_script = "<script>window.__VANTAGE_STATIC__=true;</script>"
         if "window.__VANTAGE_STATIC__" not in content:
             content = content.replace("<head>", f"<head>\n    {static_script}")
 
-        # Rewrite root-relative asset paths to use the correct base path.
+        # Rewrite root-relative asset paths to relative paths.
         # Vite builds with base="/" by default, producing paths like:
-        #   /assets/index-xxx.js  and  /assets/index-xxx.css
-        # When deployed under a subpath (e.g. /docs/), these need to become:
-        #   /docs/assets/index-xxx.js  etc.
-        if self.base_path != "/":
-            # Rewrite href="/assets/..." and src="/assets/..."
-            content = re.sub(
-                r'(href|src)="/assets/',
-                f'\\1="{self.base_path}assets/',
-                content,
-            )
+        #   /assets/index-xxx.js, /assets/index-xxx.css, /vite.svg
+        # These must be relative (./...) so the site works from any
+        # directory on S3 or other static hosts.
+        content = re.sub(
+            r'(href|src)="/([^"]*)"',
+            r'\1="./\2"',
+            content,
+        )
 
-        # Remove any existing <base href> tag — asset paths are now absolute
+        # Remove any existing <base href> tag
         content = re.sub(r'\s*<base href="[^"]*"\s*/?>', "", content)
 
         index_html.write_text(content)
+
+        # Copy index.html as 404.html — serves as error page on S3/GH Pages
+        shutil.copy2(index_html, self.output_path / "404.html")
 
     def _generate_spa_config(self) -> None:
         """Generate Cloudflare Pages SPA routing config."""

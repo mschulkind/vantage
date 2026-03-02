@@ -24,18 +24,12 @@ import axios from "axios";
 declare global {
   interface Window {
     __VANTAGE_STATIC__?: boolean;
-    __VANTAGE_BASE_PATH__?: string;
   }
 }
 
 /** Whether the app is running in static (no-backend) mode. */
 export const isStaticMode = (): boolean => {
   return !!window.__VANTAGE_STATIC__;
-};
-
-/** Get the base path for the static site (e.g. '/docs/'). Defaults to '/'. */
-export const getStaticBasePath = (): string => {
-  return window.__VANTAGE_BASE_PATH__ || "/";
 };
 
 /**
@@ -52,20 +46,16 @@ function parseParams(url: string): { base: string; params: URLSearchParams } {
 
 /**
  * Rewrite a live API URL to a static JSON file path.
+ * Returns relative paths (./api/...) so the site works from any directory.
  */
 function rewriteUrl(url: string): string {
   const { base, params } = parseParams(url);
-  const basePath = getStaticBasePath();
-
-  // Helper to prefix the base path onto a root-relative URL
-  const withBase = (path: string): string => {
-    // path starts with '/', basePath ends with '/'
-    // e.g. basePath='/docs/', path='/api/files.json' → '/docs/api/files.json'
-    return basePath + path.slice(1);
-  };
 
   // Strip any /api/r/{repo} prefix (static mode is always single-repo)
   const apiPath = base.replace(/^\/api\/r\/[^/]+/, "/api");
+
+  // Helper: convert /api/foo to ./api/foo
+  const rel = (path: string): string => `.${path}`;
 
   // Simple endpoints without query params
   const simpleEndpoints = [
@@ -75,48 +65,48 @@ function rewriteUrl(url: string): string {
     "/api/health",
   ];
   if (simpleEndpoints.includes(apiPath)) {
-    return withBase(`${apiPath}.json`);
+    return rel(`${apiPath}.json`);
   }
 
   // Tree endpoint
   if (apiPath === "/api/tree") {
     const path = params.get("path") || ".";
     const treePath = path === "." ? "_" : path;
-    return withBase(`/api/tree/${treePath}.json`);
+    return rel(`/api/tree/${treePath}.json`);
   }
 
   // Content endpoint
   if (apiPath === "/api/content") {
     const path = params.get("path") || "";
-    return withBase(`/api/content/${path}.json`);
+    return rel(`/api/content/${path}.json`);
   }
 
   // Git history
   if (apiPath === "/api/git/history") {
     const path = params.get("path") || "";
-    return withBase(`/api/git/history/${path}.json`);
+    return rel(`/api/git/history/${path}.json`);
   }
 
   // Git status
   if (apiPath === "/api/git/status") {
     const path = params.get("path") || "";
-    return withBase(`/api/git/status/${path}.json`);
+    return rel(`/api/git/status/${path}.json`);
   }
 
   // Git recent
   if (apiPath === "/api/git/recent") {
-    return withBase("/api/git/recent.json");
+    return rel("/api/git/recent.json");
   }
 
   // Git diff
   if (apiPath === "/api/git/diff") {
     const path = params.get("path") || "";
     const commit = params.get("commit") || "";
-    return withBase(`/api/git/diff/${path}/${commit}.json`);
+    return rel(`/api/git/diff/${path}/${commit}.json`);
   }
 
   // Fallback: just append .json
-  return withBase(`${apiPath}.json`);
+  return rel(`${apiPath}.json`);
 }
 
 /**
