@@ -26,6 +26,7 @@ export const useWebSocket = () => {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const serverVersionRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
+  const hiddenAtRef = useRef<number | null>(null);
 
   const { currentPath, loadFile, refreshExpandedTree, viewDirectory } = useRepoStore();
   const { fetchStatus, fetchRecentFiles } = useGitStore();
@@ -256,8 +257,24 @@ export const useWebSocket = () => {
     };
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        tryImmediateReconnect();
+      if (document.visibilityState === "hidden") {
+        hiddenAtRef.current = Date.now();
+      } else if (document.visibilityState === "visible") {
+        const hiddenMs =
+          hiddenAtRef.current !== null ? Date.now() - hiddenAtRef.current : Infinity;
+        hiddenAtRef.current = null;
+        if (hiddenMs > 30_000) {
+          // After 30s+ hidden, force reconnect regardless of readyState —
+          // the socket may appear OPEN but the underlying TCP connection is dead.
+          if (reconnectTimerRef.current) {
+            clearTimeout(reconnectTimerRef.current);
+            reconnectTimerRef.current = null;
+          }
+          reconnectAttemptRef.current = 0;
+          connect();
+        } else {
+          tryImmediateReconnect();
+        }
       }
     };
 
