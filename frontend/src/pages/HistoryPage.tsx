@@ -14,10 +14,15 @@ import {
   Layers,
   Bookmark,
   Pencil,
+  Camera,
+  Info,
 } from "lucide-react";
 import { format } from "date-fns";
 import { RelativeTime } from "../components/RelativeTime";
 import { cn } from "../lib/utils";
+
+type HistoryTab = "commits" | "snapshots";
+
 
 export const HistoryPage: React.FC = () => {
   const { "*": pathParam } = useParams();
@@ -41,7 +46,7 @@ export const HistoryPage: React.FC = () => {
     loadRepos,
   } = useRepoStore();
 
-  const [historyMode, setHistoryMode] = useState<"git" | "jj">("git");
+  const [activeTab, setActiveTab] = useState<HistoryTab>("commits");
   const [expandedEvolog, setExpandedEvolog] = useState<string | null>(null);
 
   // Parse the file path from the URL
@@ -97,20 +102,21 @@ export const HistoryPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRepo]);
 
-  // Switch to jj mode when jj is detected
+  // Fetch jj log when jj is available
   useEffect(() => {
-    if (jj.info?.is_jj) {
-      setHistoryMode("jj");
-    }
-  }, [jj.info]);
-
-  // Fetch jj log when in jj mode
-  useEffect(() => {
-    if (historyMode === "jj" && filePath) {
+    if (jj.info?.is_jj && filePath) {
       jj.fetchLog(filePath);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyMode, filePath, currentRepo]);
+  }, [jj.info?.is_jj, filePath, currentRepo]);
+
+  // Fetch jj evolog for working copy (snapshots tab)
+  useEffect(() => {
+    if (jj.info?.is_jj && activeTab === "snapshots") {
+      jj.fetchEvolog("@");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jj.info?.is_jj, activeTab, currentRepo]);
 
   const handleCommitClick = (hexsha: string) => {
     if (filePath) {
@@ -149,12 +155,21 @@ export const HistoryPage: React.FC = () => {
               >
                 <ArrowLeft size={20} />
               </AppLink>
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                <GitBranch size={18} className="text-white" />
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br",
+                activeTab === "snapshots"
+                  ? "from-violet-500 to-purple-600"
+                  : "from-blue-500 to-indigo-600",
+              )}>
+                {activeTab === "snapshots" ? (
+                  <Camera size={18} className="text-white" />
+                ) : (
+                  <GitBranch size={18} className="text-white" />
+                )}
               </div>
               <div>
                 <h1 className="font-semibold text-lg text-slate-900 dark:text-slate-100">
-                  {historyMode === "jj" ? "Revision History" : "Commit History"}
+                  File History
                 </h1>
                 <nav className="flex items-center text-xs text-slate-500 space-x-1 mt-0.5">
                   {isMultiRepo && currentRepo && (
@@ -187,32 +202,45 @@ export const HistoryPage: React.FC = () => {
                 </nav>
               </div>
             </div>
-            {/* Mode toggle when jj is available */}
+          </div>
+
+          {/* Tab bar */}
+          <div className="flex items-center gap-1 mt-3 border-b border-slate-200 dark:border-slate-700 -mb-px">
+            <button
+              onClick={() => setActiveTab("commits")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+                activeTab === "commits"
+                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300",
+              )}
+            >
+              <GitBranch size={14} />
+              Commits
+              {(jj.info?.is_jj ? jj.revisions.length : history.length) > 0 && (
+                <span className="text-xs ml-0.5 px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">
+                  {jj.info?.is_jj ? jj.revisions.length : history.length}
+                </span>
+              )}
+            </button>
             {jj.info?.is_jj && (
-              <div className="flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
-                <button
-                  onClick={() => setHistoryMode("jj")}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-                    historyMode === "jj"
-                      ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200",
-                  )}
-                >
-                  jj
-                </button>
-                <button
-                  onClick={() => setHistoryMode("git")}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-                    historyMode === "git"
-                      ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200",
-                  )}
-                >
-                  Git
-                </button>
-              </div>
+              <button
+                onClick={() => setActiveTab("snapshots")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+                  activeTab === "snapshots"
+                    ? "border-violet-500 text-violet-600 dark:text-violet-400"
+                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300",
+                )}
+              >
+                <Camera size={14} />
+                Snapshots
+                {jj.evolog.length > 0 && (
+                  <span className="text-xs ml-0.5 px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">
+                    {jj.evolog.length}
+                  </span>
+                )}
+              </button>
             )}
           </div>
         </div>
@@ -220,16 +248,35 @@ export const HistoryPage: React.FC = () => {
 
       {/* History List */}
       <div className="max-w-4xl mx-auto px-6 py-8">
-        {historyMode === "jj" ? (
-          <JJTimeline
-            revisions={jj.revisions}
-            evolog={jj.evolog}
-            isLoading={jj.isLoading}
-            expandedEvolog={expandedEvolog}
-            onRevClick={handleJJRevClick}
-            onEvologToggle={handleEvologToggle}
-          />
-        ) : isLoading ? (
+        {/* Tab explanation */}
+        <div className="flex items-start gap-2 mb-6 p-3 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs text-slate-500 dark:text-slate-400">
+          <Info size={14} className="shrink-0 mt-0.5" />
+          {activeTab === "commits" ? (
+            <span>
+              <strong className="text-slate-700 dark:text-slate-300">Commits</strong> are intentional revisions
+              {jj.info?.is_jj ? " (jj revisions)" : " (git commits)"}
+              {" "}— each one represents a deliberate save point where changes were described and committed.
+            </span>
+          ) : (
+            <span>
+              <strong className="text-slate-700 dark:text-slate-300">Snapshots</strong> are automatic saves that jj creates
+              every time you modify a file. They capture every intermediate state of your working copy,
+              even changes you haven&apos;t committed yet. Use this to recover lost work or see how a file evolved.
+            </span>
+          )}
+        </div>
+
+        {activeTab === "commits" ? (
+          jj.info?.is_jj ? (
+            <JJTimeline
+              revisions={jj.revisions}
+              evolog={jj.evolog}
+              isLoading={jj.isLoading}
+              expandedEvolog={expandedEvolog}
+              onRevClick={handleJJRevClick}
+              onEvologToggle={handleEvologToggle}
+            />
+          ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-slate-200 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin" />
           </div>
@@ -307,7 +354,32 @@ export const HistoryPage: React.FC = () => {
               ))}
             </div>
           </div>
-        )}
+        )
+        ) : activeTab === "snapshots" && jj.info?.is_jj ? (
+          /* Snapshots tab — jj evolog of working copy */
+          jj.isLoading ? (
+            <div className="flex justify-center py-20">
+              <div className="w-8 h-8 border-4 border-slate-200 dark:border-slate-600 border-t-violet-600 rounded-full animate-spin" />
+            </div>
+          ) : jj.evolog.length === 0 ? (
+            <div className="text-center py-20 text-slate-400">
+              <Camera size={48} className="mx-auto mb-4 text-slate-300" />
+              <p className="text-lg font-medium text-slate-500">
+                No snapshots found
+              </p>
+              <p className="text-sm mt-1">jj hasn&apos;t captured any working-copy snapshots yet.</p>
+            </div>
+          ) : (
+            <SnapshotTimeline
+              evolog={jj.evolog}
+              onEntryClick={(entry) => {
+                if (filePath) {
+                  jj.fetchDiff(entry.commit_id, filePath);
+                }
+              }}
+            />
+          )
+        ) : null}
       </div>
 
       {/* Git Diff Viewer Modal */}
@@ -590,6 +662,88 @@ const JJTimeline: React.FC<{
                 )}
               </div>
             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Snapshot timeline — shows evolog of working copy (automatic jj saves)
+const SnapshotTimeline: React.FC<{
+  evolog: JJEvoEntry[];
+  onEntryClick: (entry: JJEvoEntry) => void;
+}> = ({ evolog, onEntryClick }) => {
+  return (
+    <div className="relative">
+      {/* Timeline line */}
+      <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-violet-200 dark:bg-violet-800" />
+
+      <div className="space-y-1">
+        {evolog.map((entry, index) => (
+          <div
+            key={`${entry.commit_id}-${index}`}
+            className="relative flex items-start group"
+          >
+            {/* Timeline dot */}
+            <div
+              className={cn(
+                "relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1 transition-colors",
+                index === 0
+                  ? "bg-violet-500 text-white"
+                  : entry.hidden
+                    ? "bg-slate-200 dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 text-slate-400"
+                    : "bg-white dark:bg-slate-800 border-2 border-violet-200 dark:border-violet-700 text-violet-400 group-hover:border-violet-400 group-hover:text-violet-500",
+              )}
+            >
+              <Camera size={16} />
+            </div>
+
+            {/* Snapshot card */}
+            <button
+              onClick={() => onEntryClick(entry)}
+              className={cn(
+                "ml-4 flex-1 text-left bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 transition-all cursor-pointer",
+                "hover:border-violet-200 dark:hover:border-violet-700 hover:shadow-md hover:bg-violet-50/30 dark:hover:bg-violet-900/20",
+                index === 0 && "border-violet-200 dark:border-violet-700 shadow-sm",
+                entry.hidden && "opacity-60",
+              )}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 mb-1.5">
+                    <MessageSquare size={14} className="text-slate-400 shrink-0" />
+                    <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                      {entry.description || "(automatic snapshot)"}
+                    </span>
+                    {entry.hidden && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400">
+                        hidden
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-4 text-xs text-slate-500">
+                    {entry.operation && (
+                      <div className="flex items-center space-x-1.5">
+                        <Layers size={12} />
+                        <span className="font-mono">{entry.operation}</span>
+                      </div>
+                    )}
+                    {entry.timestamp && (
+                      <div className="flex items-center space-x-1.5">
+                        <Clock size={12} />
+                        <span title={format(new Date(entry.timestamp), "PPpp")}>
+                          <RelativeTime date={entry.timestamp} />
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <span className="font-mono text-xs text-slate-400 bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded-md border border-slate-100 dark:border-slate-600 shrink-0">
+                  {entry.commit_id.slice(0, 12)}
+                </span>
+              </div>
+            </button>
           </div>
         ))}
       </div>

@@ -164,12 +164,14 @@ describe("useRepoStore", () => {
     });
 
     it("sets empty children on API error to clear spinner", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const initialTree = [{ name: "subdir", path: "subdir", is_dir: true }];
       useRepoStore.setState({ fileTree: initialTree });
 
       mockedAxios.get.mockRejectedValueOnce(new Error("Network error"));
 
       await useRepoStore.getState().loadDirChildren("subdir");
+      consoleSpy.mockRestore();
 
       const tree = useRepoStore.getState().fileTree;
       // children should be empty array, not undefined — spinner must stop
@@ -177,12 +179,14 @@ describe("useRepoStore", () => {
     });
 
     it("sets empty children on timeout to clear spinner", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const initialTree = [{ name: "subdir", path: "subdir", is_dir: true }];
       useRepoStore.setState({ fileTree: initialTree });
 
       mockedAxios.get.mockRejectedValueOnce(new Error("timeout of 15000ms exceeded"));
 
       await useRepoStore.getState().loadDirChildren("subdir");
+      consoleSpy.mockRestore();
 
       const tree = useRepoStore.getState().fileTree;
       expect(tree[0].children).toEqual([]);

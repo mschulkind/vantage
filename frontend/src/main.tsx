@@ -1,21 +1,19 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, HashRouter } from "react-router-dom";
 import "./index.css";
 import App from "./App.tsx";
-import { initStaticMode, getStaticBasePath } from "./lib/staticMode";
+import { initStaticMode, isStaticMode } from "./lib/staticMode";
 
 // Initialize static mode interceptor before any API calls
 initStaticMode();
 
-// In static mode, the app may be deployed under a subpath (e.g. /docs/).
-// React Router needs the basename to strip it from the URL.
-const basename = getStaticBasePath().replace(/\/$/, "") || "/";
+const Router = isStaticMode() ? HashRouter : BrowserRouter;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter basename={basename}>
+    <Router>
       <App />
-    </BrowserRouter>
+    </Router>
   </StrictMode>,
 );
