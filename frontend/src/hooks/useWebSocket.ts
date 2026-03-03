@@ -27,6 +27,8 @@ export const useWebSocket = () => {
   const serverVersionRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const hiddenAtRef = useRef<number | null>(null);
+  const disconnectedAtRef = useRef<number | null>(null);
+  const connectCountRef = useRef(0);
 
   const { currentPath, loadFile, refreshExpandedTree, viewDirectory } = useRepoStore();
   const { fetchStatus, fetchRecentFiles } = useGitStore();
@@ -53,7 +55,7 @@ export const useWebSocket = () => {
 
     if (processingRef.current) {
       // Still processing previous batch — reschedule instead of dropping
-      console.debug(
+      console.log(
         "[ws] processBatch deferred: previous batch still processing, %d paths pending",
         changedPaths.size,
       );
@@ -83,7 +85,7 @@ export const useWebSocket = () => {
     pendingPathsRef.current = new Set();
     processingRef.current = true;
 
-    console.debug(
+    console.log(
       "[ws] Processing batch: %d paths changed",
       changedPaths.size,
     );
@@ -130,9 +132,9 @@ export const useWebSocket = () => {
     if (!reposLoaded) return;
     if (isMultiRepo && !currentRepo) return;
 
-    console.debug("[ws] Refreshing after reconnect");
-
     const path = currentPathRef.current;
+    console.log("[ws] Refreshing after reconnect (path=%s)", path ?? "(none)");
+
     if (path) {
       if (path.toLowerCase().endsWith(".md")) {
         loadFile(path);
@@ -155,20 +157,27 @@ export const useWebSocket = () => {
         if (serverVersionRef.current === null) {
           // First connect — just record it
           serverVersionRef.current = version;
+          console.log("[ws] Server hello: version=%s", version);
         } else if (serverVersionRef.current !== version) {
           // Server restarted with new code — force reload
-          console.log("Server version changed, reloading...");
+          console.log(
+            "[ws] Server version changed: %s → %s, reloading page",
+            serverVersionRef.current,
+            version,
+          );
           window.location.reload();
           return;
+        } else {
+          console.log("[ws] Server hello: version=%s (unchanged)", version);
         }
         return;
       }
 
       if (message.type === "files_changed" && message.paths) {
-        console.debug(
-          "[ws] files_changed: %d paths",
+        console.log(
+          "[ws] files_changed: %d paths: %s",
           message.paths.length,
-          message.paths,
+          message.paths.join(", "),
         );
         for (const p of message.paths) {
           pendingPathsRef.current.add(p);
@@ -202,10 +211,25 @@ export const useWebSocket = () => {
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
-    const socket = new WebSocket(`${protocol}//${host}/api/ws`);
+    const url = `${protocol}//${host}/api/ws`;
+    const connectNum = ++connectCountRef.current;
+    console.log(
+      "[ws] Connecting (#%d) to %s",
+      connectNum,
+      url,
+    );
+    const socket = new WebSocket(url);
 
     socket.onopen = () => {
-      console.log("WebSocket connected");
+      const downtime = disconnectedAtRef.current
+        ? `${((Date.now() - disconnectedAtRef.current) / 1000).toFixed(1)}s`
+        : null;
+      disconnectedAtRef.current = null;
+      console.log(
+        "[ws] Connected (#%d)%s",
+        connectNum,
+        downtime ? ` — was disconnected for ${downtime}` : " (initial)",
+      );
       reconnectAttemptRef.current = 0;
       // Refresh everything since we may have missed changes while disconnected
       refreshAfterReconnect();
@@ -214,11 +238,18 @@ export const useWebSocket = () => {
     socket.onmessage = handleMessage;
 
     socket.onerror = (error) => {
-      console.error("WebSocket error:", error);
+      console.error("[ws] Error on connection #%d:", connectNum, error);
     };
 
-    socket.onclose = () => {
-      console.log("WebSocket closed");
+    socket.onclose = (event: CloseEvent) => {
+      disconnectedAtRef.current = Date.now();
+      console.log(
+        "[ws] Closed (#%d): code=%d reason=%s wasClean=%s",
+        connectNum,
+        event.code,
+        event.reason || "(none)",
+        event.wasClean,
+      );
       socketRef.current = null;
       // Schedule a reconnect (defer via ref to avoid circular dependency)
       if (!reconnectTimerRef.current && mountedRef.current) {
@@ -229,7 +260,9 @@ export const useWebSocket = () => {
         );
         reconnectAttemptRef.current = attempt + 1;
         console.log(
-          `WebSocket reconnecting in ${delay}ms (attempt ${attempt + 1})`,
+          "[ws] Scheduling reconnect in %dms (attempt %d)",
+          delay,
+          attempt + 1,
         );
         reconnectTimerRef.current = setTimeout(() => {
           reconnectTimerRef.current = null;
@@ -245,7 +278,19 @@ export const useWebSocket = () => {
   useEffect(() => {
     if (staticMode) return;
     const tryImmediateReconnect = () => {
+      const state = socketRef.current?.readyState ?? -1;
+      const stateNames: Record<number, string> = {
+        [-1]: "null",
+        [WebSocket.CONNECTING]: "CONNECTING",
+        [WebSocket.OPEN]: "OPEN",
+        [WebSocket.CLOSING]: "CLOSING",
+        [WebSocket.CLOSED]: "CLOSED",
+      };
       if (!socketRef.current || socketRef.current.readyState > WebSocket.OPEN) {
+        console.log(
+          "[ws] Immediate reconnect triggered (readyState=%s)",
+          stateNames[state] ?? state,
+        );
         // Cancel any pending scheduled reconnect and connect now
         if (reconnectTimerRef.current) {
           clearTimeout(reconnectTimerRef.current);
@@ -259,13 +304,29 @@ export const useWebSocket = () => {
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         hiddenAtRef.current = Date.now();
+        console.log("[ws] Tab hidden");
       } else if (document.visibilityState === "visible") {
         const hiddenMs =
           hiddenAtRef.current !== null ? Date.now() - hiddenAtRef.current : Infinity;
         hiddenAtRef.current = null;
+        const hiddenStr =
+          hiddenMs === Infinity
+            ? "unknown"
+            : hiddenMs < 1000
+              ? `${hiddenMs}ms`
+              : `${(hiddenMs / 1000).toFixed(1)}s`;
+        console.log(
+          "[ws] Tab visible (was hidden for %s, readyState=%s)",
+          hiddenStr,
+          socketRef.current?.readyState ?? "null",
+        );
         if (hiddenMs > 30_000) {
           // After 30s+ hidden, force reconnect regardless of readyState —
           // the socket may appear OPEN but the underlying TCP connection is dead.
+          console.log(
+            "[ws] Force reconnect: tab was hidden for %s (>30s threshold)",
+            hiddenStr,
+          );
           if (reconnectTimerRef.current) {
             clearTimeout(reconnectTimerRef.current);
             reconnectTimerRef.current = null;

@@ -89,7 +89,7 @@ typecheck:
     uv run basedpyright src/ --warnings || true
 
 test-py:
-    uv run pytest tests/ -v
+    uv run python -m pytest tests/ -v
 
 test-js:
     cd frontend && npm run test
@@ -100,7 +100,7 @@ test-e2e:
 test: test-py test-js
 
 coverage-py:
-    uv run pytest tests/ -v --cov=src/vantage --cov-report=term-missing --cov-report=html
+    uv run python -m pytest tests/ -v --cov=src/vantage --cov-report=term-missing --cov-report=html
 
 coverage-js:
     cd frontend && npm run test:coverage
@@ -217,7 +217,7 @@ prepromote:
 
     # 5. Backend tests
     step "5/8" "Backend tests"
-    if ! uv run pytest tests/ -q --tb=short 2>&1; then
+    if ! uv run python -m pytest tests/ -q --tb=short 2>&1; then
         echo "FAIL: Backend tests failed."
         FAILED=1
     else

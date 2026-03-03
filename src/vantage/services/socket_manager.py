@@ -14,19 +14,29 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-        logger.debug("WebSocket connected (total: %d)", len(self.active_connections))
+        client = websocket.client
+        logger.info(
+            "WebSocket connected from %s (total: %d)",
+            f"{client.host}:{client.port}" if client else "unknown",
+            len(self.active_connections),
+        )
 
     def disconnect(self, websocket: WebSocket):
         try:
             self.active_connections.remove(websocket)
-            logger.debug("WebSocket disconnected (total: %d)", len(self.active_connections))
+            client = websocket.client
+            logger.info(
+                "WebSocket disconnected from %s (total: %d)",
+                f"{client.host}:{client.port}" if client else "unknown",
+                len(self.active_connections),
+            )
         except ValueError:
             # Already removed (e.g. both onerror and onclose fired)
             logger.debug("WebSocket already removed from active connections")
 
     async def broadcast(self, message: dict[str, Any]):
         if not self.active_connections:
-            logger.debug("Broadcast skipped: no active connections")
+            logger.info("Broadcast skipped: no active connections")
             return
 
         dead: list[WebSocket] = []
@@ -43,7 +53,7 @@ class ConnectionManager:
             with contextlib.suppress(ValueError):
                 self.active_connections.remove(conn)
 
-        logger.debug(
+        logger.info(
             "Broadcast complete: sent=%d, failed=%d, remaining=%d",
             sent,
             len(dead),
