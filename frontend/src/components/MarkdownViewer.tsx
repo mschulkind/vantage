@@ -294,7 +294,7 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
     >
       <FrontmatterDisplay frontmatter={frontmatter} />
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+        remarkPlugins={[[remarkGfm, { singleTilde: false }], [remarkMath, { singleDollarTextMath: false }]]}
         rehypePlugins={[
           rehypeRaw,
           [rehypeSanitize, sanitizeSchema],
