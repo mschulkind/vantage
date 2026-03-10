@@ -3,6 +3,7 @@ from pathlib import Path
 
 from vantage.schemas.models import FileContent, FileNode
 from vantage.services.git_service import GitService
+from vantage.services.perf import timed
 
 
 class FileSystemService:
@@ -83,6 +84,7 @@ class FileSystemService:
             pass
         return False
 
+    @timed("fs", "list_directory")
     def list_directory(self, path: str = ".", include_git: bool = False) -> list[FileNode]:
         """List a directory's contents.
 
@@ -154,6 +156,7 @@ class FileSystemService:
 
         return sorted(nodes, key=lambda x: (not x.is_dir, x.name))
 
+    @timed("fs", "list_all_files")
     def list_all_files(self, extensions: list[str] | None = None) -> list[str]:
         """Recursively list all files under root_path, returning relative paths.
 

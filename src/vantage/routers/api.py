@@ -376,3 +376,47 @@ async def get_jj_interdiff(from_rev: str, to_rev: str, path: str | None = None):
     if not diff:
         raise HTTPException(status_code=404, detail="No changes between these revisions")
     return diff
+
+
+# --- Performance diagnostics ---
+
+
+@router.get("/perf/diagnostics")
+async def get_perf_diagnostics():
+    """Return anonymized performance diagnostics.
+
+    Safe to share — contains only timing data and aggregate repo shape
+    statistics. No file names, paths, or content are included.
+    """
+    from vantage.services.perf import collect_repo_shape, perf_store
+
+    # Collect repo shape stats
+    repo_shapes = {}
+    daemon_cfg = get_daemon_config()
+    if daemon_cfg:
+        for name, repo_cfg in daemon_cfg.repos.items():
+            repo_shapes[name] = collect_repo_shape(str(repo_cfg.path))
+    else:
+        repo_shapes["default"] = collect_repo_shape(str(settings.target_repo))
+
+    return {
+        "requests": {
+            "total": perf_store.request_count,
+            "by_endpoint": perf_store.by_operation(category="request"),
+        },
+        "services": {
+            "total": perf_store.service_call_count,
+            "by_operation": perf_store.by_operation(category=None),
+        },
+        "slow_requests": perf_store.slow_requests(threshold_ms=200),
+        "repo_shape": repo_shapes,
+    }
+
+
+@router.post("/perf/reset")
+async def reset_perf_data():
+    """Clear all collected performance data."""
+    from vantage.services.perf import perf_store
+
+    perf_store.clear()
+    return {"status": "cleared"}

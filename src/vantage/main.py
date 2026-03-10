@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from vantage.routers import api, socket
+from vantage.services.perf import PerfMiddleware
 from vantage.services.watcher import watch_multi_repo, watch_repo
 from vantage.settings import settings
 
@@ -27,6 +28,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Vantage", lifespan=lifespan)
+app.add_middleware(PerfMiddleware)
 
 
 @app.middleware("http")

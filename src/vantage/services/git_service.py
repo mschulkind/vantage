@@ -13,6 +13,7 @@ from typing import Any
 from git import Repo
 
 from vantage.schemas.models import DiffHunk, DiffLine, FileDiff, GitCommit
+from vantage.services.perf import timed
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,7 @@ class GitService:
         child_rel = "/".join(parts[1:])
         return child_service, child_rel
 
+    @timed("git", "get_history")
     def get_history(self, path: str, limit: int = 10) -> list[GitCommit]:
         """Get commit history for a file using fast git subprocess."""
         if not self.repo or not self.repo.working_dir:
@@ -134,6 +136,7 @@ class GitService:
         history = self.get_history(path, limit=1)
         return history[0] if history else None
 
+    @timed("git", "get_last_commits_batch")
     def get_last_commits_batch(self, paths: list[str]) -> dict[str, GitCommit]:
         """Get last commit for multiple paths in a single git log call.
 
@@ -211,6 +214,7 @@ class GitService:
         """Get the repository name from the working directory."""
         return self.repo_path.name
 
+    @timed("git", "get_working_dir_status")
     def get_working_dir_status(self) -> dict[str, str]:
         """Get git status of files in the working directory.
 
@@ -562,6 +566,7 @@ class GitService:
         all_results.sort(key=lambda r: r["date"], reverse=True)
         return all_results[:limit]
 
+    @timed("git", "get_recently_changed_files")
     def get_recently_changed_files(
         self, limit: int = 30, extensions: list[str] | None = None
     ) -> list[dict[str, Any]]:
@@ -891,6 +896,7 @@ class GitService:
         _recent_files_cache[cache_key] = (time.monotonic(), trimmed)
         return trimmed
 
+    @timed("git", "get_file_diff")
     def get_file_diff(self, path: str, commit_sha: str) -> FileDiff | None:
         """Get the diff for a specific file at a specific commit."""
         if not self.repo:

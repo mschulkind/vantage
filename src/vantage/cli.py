@@ -313,6 +313,118 @@ def build(repo_path: str, output: str, frontend_dist: str | None, name: str | No
     click.echo(f"  npx wrangler pages deploy {output_path}")
 
 
+@cli.command("perf-report")
+@click.option("--host", default="127.0.0.1", help="Vantage server host")
+@click.option("--port", type=int, default=8000, help="Vantage server port")
+@click.option("--json", "as_json", is_flag=True, help="Output raw JSON instead of formatted report")
+@click.option("--reset", is_flag=True, help="Reset perf counters after collecting")
+def perf_report(host: str, port: int, as_json: bool, reset: bool):
+    """Collect and display performance diagnostics from a running Vantage instance.
+
+    Connects to the Vantage server API and retrieves anonymized timing data
+    and repo shape statistics. Safe to share — no file names or content.
+
+    \b
+    Examples:
+        vantage perf-report                    # Default: localhost:8000
+        vantage perf-report --port 8200        # Dev server
+        vantage perf-report --json > perf.json # Export for sharing
+    """
+    import json
+    import urllib.request
+
+    url = f"http://{host}:{port}/api/perf/diagnostics"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        click.echo(f"Failed to connect to Vantage at {host}:{port}: {e}", err=True)
+        sys.exit(1)
+
+    if as_json:
+        click.echo(json.dumps(data, indent=2))
+    else:
+        _print_perf_report(data)
+
+    if reset:
+        try:
+            req = urllib.request.Request(f"http://{host}:{port}/api/perf/reset", method="POST")
+            urllib.request.urlopen(req, timeout=5)
+            click.echo("\n✓ Performance counters reset.")
+        except Exception:
+            click.echo("\n⚠ Failed to reset counters.", err=True)
+
+
+def _print_perf_report(data: dict):
+    """Pretty-print a performance diagnostics report."""
+    click.secho("═══ Vantage Performance Report ═══", fg="cyan", bold=True)
+    click.echo()
+
+    # Request summary
+    req = data.get("requests", {})
+    click.secho(f"Total API requests: {req.get('total', 0)}", bold=True)
+    click.echo()
+
+    endpoints = req.get("by_endpoint", {})
+    if endpoints:
+        click.secho("Endpoint Latencies (ms):", fg="yellow", bold=True)
+        click.echo(f"  {'Endpoint':<40} {'Count':>6} {'p50':>8} {'p95':>8} {'p99':>8} {'max':>8}")
+        click.echo(f"  {'─' * 40} {'─' * 6} {'─' * 8} {'─' * 8} {'─' * 8} {'─' * 8}")
+        for ep, stats in sorted(endpoints.items(), key=lambda x: x[1].get("p95", 0), reverse=True):
+            p95 = stats.get("p95", 0)
+            color = "red" if p95 > 500 else "yellow" if p95 > 100 else None
+            line = f"  {ep:<40} {stats.get('count', 0):>6} {stats.get('p50', 0):>8.1f} {p95:>8.1f} {stats.get('p99', 0):>8.1f} {stats.get('max', 0):>8.1f}"
+            click.secho(line, fg=color)
+        click.echo()
+
+    # Service operations
+    svc = data.get("services", {})
+    ops = svc.get("by_operation", {})
+    # Filter to only service-level operations (not requests)
+    svc_ops = {
+        k: v for k, v in ops.items() if not k.startswith("GET ") and not k.startswith("POST ")
+    }
+    if svc_ops:
+        click.secho("Service Operation Latencies (ms):", fg="yellow", bold=True)
+        click.echo(f"  {'Operation':<35} {'Count':>6} {'p50':>8} {'p95':>8} {'max':>8}")
+        click.echo(f"  {'─' * 35} {'─' * 6} {'─' * 8} {'─' * 8} {'─' * 8}")
+        for op, stats in sorted(svc_ops.items(), key=lambda x: x[1].get("p95", 0), reverse=True):
+            p95 = stats.get("p95", 0)
+            color = "red" if p95 > 500 else "yellow" if p95 > 100 else None
+            line = f"  {op:<35} {stats.get('count', 0):>6} {stats.get('p50', 0):>8.1f} {p95:>8.1f} {stats.get('max', 0):>8.1f}"
+            click.secho(line, fg=color)
+        click.echo()
+
+    # Slow requests
+    slow = data.get("slow_requests", [])
+    if slow:
+        click.secho(f"Slow Requests (>200ms): {len(slow)} captured", fg="red", bold=True)
+        for s in slow[:10]:
+            click.echo(f"  {s['duration_ms']:>8.0f}ms  {s['operation']}")
+        click.echo()
+
+    # Repo shape
+    shapes = data.get("repo_shape", {})
+    if shapes:
+        click.secho("Repository Shape:", fg="yellow", bold=True)
+        for name, shape in shapes.items():
+            click.echo(f"  {name}:")
+            click.echo(
+                f"    Files: {shape.get('total_files', 0):,}  |  Dirs: {shape.get('total_dirs', 0):,}  |  Max depth: {shape.get('max_depth', 0)}"
+            )
+            ext = shape.get("extension_distribution", {})
+            if ext:
+                top = list(ext.items())[:8]
+                dist_str = ", ".join(f"{k}: {v}" for k, v in top)
+                click.echo(f"    Extensions: {dist_str}")
+            dc = shape.get("dir_entry_count", {})
+            if dc:
+                click.echo(
+                    f"    Dir sizes: p50={dc.get('p50', 0)}, p95={dc.get('p95', 0)}, max={dc.get('max', 0)}"
+                )
+        click.echo()
+
+
 def main():
     """Entry point for the CLI."""
     cli()

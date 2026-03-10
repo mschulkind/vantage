@@ -14,6 +14,7 @@ from vantage.schemas.models import (
     JJInfo,
     JJRevision,
 )
+from vantage.services.perf import timed
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ class JJService:
             working_copy_change_id=change_id.strip() if change_id else None,
         )
 
+    @timed("jj", "get_log")
     def get_log(self, path: str | None = None, limit: int = 50) -> list[JJRevision]:
         """Get jj revision log, optionally for a specific file."""
         if not self.is_jj:
@@ -112,6 +114,7 @@ class JJService:
 
         return revisions
 
+    @timed("jj", "get_evolog")
     def get_evolog(self, rev: str = "@", limit: int = 20) -> list[JJEvoEntry]:
         """Get evolution log for a specific revision."""
         if not self.is_jj:
@@ -191,6 +194,7 @@ class JJService:
 
         return entries
 
+    @timed("jj", "get_diff")
     def get_diff(
         self,
         rev: str,
@@ -258,6 +262,7 @@ class JJService:
             raw_diff=output,
         )
 
+    @timed("jj", "get_interdiff")
     def get_interdiff(self, from_rev: str, to_rev: str, path: str | None = None) -> FileDiff | None:
         """Get diff between two jj revisions."""
         if not self.is_jj:
