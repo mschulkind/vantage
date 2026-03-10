@@ -197,6 +197,65 @@ vantage build PATH -o OUTPUT     # Build a static site
 
 ---
 
+## 🐳 Docker
+
+Run Vantage in Docker. Each directory gets its own isolated container with auto-assigned ports — view multiple documentation folders simultaneously.
+
+### Quick Start
+
+```bash
+# 1. Build the image (one-time)
+docker build -t vantage .
+
+# 2. Install the CLI (symlink to your PATH)
+ln -sf /path/to/vantage/vantage-docker /usr/local/bin/vantage-docker
+
+# 3. View your docs
+cd ~/my-docs
+vantage-docker up
+```
+
+### Commands
+
+```bash
+vantage-docker up                     # Start viewer for current directory
+vantage-docker up ~/projects/docs     # Start viewer for a specific path
+vantage-docker up -p 9000             # Use a specific port (default: auto-assign)
+vantage-docker up --build             # Rebuild the Docker image before starting
+vantage-docker down                   # Stop viewer for current directory
+vantage-docker down --all             # Stop all running viewers
+vantage-docker status                 # List all running viewers with ports
+vantage-docker logs                   # Tail container logs for current directory
+```
+
+Running `up` twice for the same directory is safe — it prints the existing URL.
+
+### Multiple Viewers
+
+Each directory gets its own container on its own port:
+
+```bash
+cd ~/notes        && vantage-docker up   # → http://localhost:54821
+cd ~/work/specs   && vantage-docker up   # → http://localhost:61033
+cd ~/project/docs && vantage-docker up   # → http://localhost:49217
+
+vantage-docker status                    # see all three
+vantage-docker down --all                # stop everything
+```
+
+### Docker Compose
+
+Alternatively, use the included `docker-compose.yml` directly:
+
+```bash
+VANTAGE_DOCS=~/my-docs docker compose up -d
+VANTAGE_DOCS=~/my-docs VANTAGE_PORT=9000 docker compose up -d
+```
+
+Files are mounted read-only into the container. Edits on the host are detected automatically and the browser refreshes via WebSocket — no manual reload needed.
+
+---
+
 ## 🔌 API
 
 Vantage exposes a REST API for programmatic access.
