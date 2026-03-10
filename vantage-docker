@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# vantage-docker — Run Vantage markdown viewer in Docker
+#
+# Subcommand-based CLI, like docker compose.
+# Each directory gets its own container with auto-assigned ports.
+#
+# Usage:
+#   vantage-docker up [PATH]        Start viewer (default: current directory)
+#   vantage-docker up -p 9000 .     Start on a specific port
+#   vantage-docker up --build .     Rebuild image before starting
+#   vantage-docker down [PATH]      Stop viewer for a directory
+#   vantage-docker down --all       Stop all running viewers
+#   vantage-docker status           Show all running viewers
+#   vantage-docker logs [PATH]      Tail logs for a directory's viewer
+#
+# Install:
+#   ln -sf /Users/fw/workspaces/vantage/vantage-docker /usr/local/bin/vantage-docker
+
+IMAGE_NAME="vantage"
+
+# --- helpers ---------------------------------------------------------------
+
+container_name_for() {
+    local hash
+    hash=$(echo -n "$1" | md5sum 2>/dev/null | cut -c1-12 || echo -n "$1" | md5 -q 2>/dev/null | cut -c1-12)
+    echo "vantage-${hash}"
+}
+
+find_free_port() {
+    python3 -c "import socket; s=socket.socket(); s.bind(('',0)); print(s.getsockname()[1]); s.close()"
+}
+
+resolve_docs_path() {
+    local p="${1:-}"
+    if [[ -z "$p" ]]; then
+        pwd
+    else
+        (cd "$p" && pwd)
+    fi
+}
+
+script_dir() {
+    cd "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")")" && pwd
+}
+
+# --- commands --------------------------------------------------------------
+
+cmd_up() {
+    local port="" build=false docs_path=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -p|--port) port="$2"; shift 2 ;;
+            --build)   build=true; shift ;;
+            *)         docs_path="$1"; shift ;;
+        esac
+    done
+
+    docs_path=$(resolve_docs_path "$docs_path")
+
+    if [[ ! -d "$docs_path" ]]; then
+        echo "Error: '$docs_path' is not a directory" >&2
+        exit 1
+    fi
+
+    local name
+    name=$(container_name_for "$docs_path")
+
+    # Already running? Just show the URL.
+    if docker ps -q -f name="^${name}$" | grep -q .; then
+        local existing_port
+        existing_port=$(docker port "$name" 8000 | head -1 | cut -d: -f2)
+        echo "Already running for: $docs_path"
+        echo "URL: http://localhost:${existing_port}"
+        echo ""
+        echo "Run 'vantage-docker down' to stop it."
+        return 0
+    fi
+
+    local src
+    src=$(script_dir)
+
+    # Build image if needed
+    if $build || ! docker image inspect "$IMAGE_NAME" &>/dev/null; then
+        echo "Building Docker image '$IMAGE_NAME'..."
+        docker build -t "$IMAGE_NAME" "$src"
+    fi
+
+    # Clean up stopped container with same name
+    docker rm "$name" 2>/dev/null || true
+
+    if [[ -z "$port" ]]; then
+        port=$(find_free_port)
+    fi
+
+    echo "Serving: $docs_path"
+    echo "URL:     http://localhost:$port"
+    echo ""
+
+    docker run \
+        --name "$name" \
+        --rm \
+        -d \
+        -p "$port:8000" \
+        -v "$docs_path:/docs:ro" \
+        --label "app=vantage" \
+        --label "vantage.docs=$docs_path" \
+        "$IMAGE_NAME" >/dev/null
+
+    echo "Started in background. Run 'vantage-docker down' here to stop."
+}
+
+cmd_down() {
+    local all=false docs_path=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --all|-a) all=true; shift ;;
+            *)        docs_path="$1"; shift ;;
+        esac
+    done
+
+    if $all; then
+        local ids
+        ids=$(docker ps -q --filter "label=app=vantage")
+        if [[ -z "$ids" ]]; then
+            echo "No running vantage containers."
+        else
+            echo "Stopping all vantage containers..."
+            docker stop $ids >/dev/null
+            echo "Done."
+        fi
+        return 0
+    fi
+
+    docs_path=$(resolve_docs_path "$docs_path")
+    local name
+    name=$(container_name_for "$docs_path")
+
+    if docker ps -q -f name="^${name}$" | grep -q .; then
+        echo "Stopping viewer for: $docs_path"
+        docker stop "$name" >/dev/null
+        echo "Stopped."
+    else
+        echo "No running viewer for: $docs_path"
+    fi
+}
+
+cmd_status() {
+    local output
+    output=$(docker ps --filter "label=app=vantage" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Label \"vantage.docs\"}}")
+    if [[ -z "$output" ]] || [[ $(echo "$output" | wc -l) -le 1 ]]; then
+        echo "No running vantage containers."
+    else
+        echo "$output"
+    fi
+}
+
+cmd_logs() {
+    local docs_path=""
+    docs_path=$(resolve_docs_path "${1:-}")
+    local name
+    name=$(container_name_for "$docs_path")
+
+    if docker ps -q -f name="^${name}$" | grep -q .; then
+        docker logs -f "$name"
+    else
+        echo "No running viewer for: $docs_path"
+        exit 1
+    fi
+}
+
+cmd_help() {
+    echo "Usage: vantage-docker <command> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  up [PATH]           Start viewer (default: current directory)"
+    echo "    -p, --port PORT     Use a specific port (default: auto)"
+    echo "    --build             Rebuild the Docker image first"
+    echo "  down [PATH]         Stop viewer for a directory"
+    echo "    --all, -a           Stop all running viewers"
+    echo "  status              Show all running viewers"
+    echo "  logs [PATH]         Tail container logs"
+    echo "  help                Show this help"
+}
+
+# --- main ------------------------------------------------------------------
+
+COMMAND="${1:-help}"
+shift 2>/dev/null || true
+
+case "$COMMAND" in
+    up)      cmd_up "$@" ;;
+    down)    cmd_down "$@" ;;
+    status)  cmd_status ;;
+    logs)    cmd_logs "$@" ;;
+    help|-h|--help) cmd_help ;;
+    *)
+        echo "Unknown command: $COMMAND" >&2
+        cmd_help >&2
+        exit 1
+        ;;
+esac
