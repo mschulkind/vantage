@@ -317,25 +317,28 @@ def build(repo_path: str, output: str, frontend_dist: str | None, name: str | No
 @click.option("--host", default="127.0.0.1", help="Vantage server host")
 @click.option("--port", type=int, default=8000, help="Vantage server port")
 @click.option("--json", "as_json", is_flag=True, help="Output raw JSON instead of formatted report")
+@click.option("--shape", is_flag=True, help="Include repo shape stats (slow for large repos)")
 @click.option("--reset", is_flag=True, help="Reset perf counters after collecting")
-def perf_report(host: str, port: int, as_json: bool, reset: bool):
+def perf_report(host: str, port: int, as_json: bool, shape: bool, reset: bool):
     """Collect and display performance diagnostics from a running Vantage instance.
 
-    Connects to the Vantage server API and retrieves anonymized timing data
-    and repo shape statistics. Safe to share — no file names or content.
+    Connects to the Vantage server API and retrieves anonymized timing data.
+    Safe to share — no file names, project names, or content.
 
     \b
     Examples:
-        vantage perf-report                    # Default: localhost:8000
-        vantage perf-report --port 8200        # Dev server
+        vantage perf-report                    # Timing data only (fast)
+        vantage perf-report --shape            # Include repo shape (slow)
         vantage perf-report --json > perf.json # Export for sharing
     """
     import json
     import urllib.request
 
-    url = f"http://{host}:{port}/api/perf/diagnostics"
+    params = "?include_shape=true" if shape else ""
+    url = f"http://{host}:{port}/api/perf/diagnostics{params}"
+    timeout = 120 if shape else 10
     try:
-        with urllib.request.urlopen(url, timeout=10) as resp:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
             data = json.loads(resp.read())
     except Exception as e:
         click.echo(f"Failed to connect to Vantage at {host}:{port}: {e}", err=True)
