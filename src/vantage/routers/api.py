@@ -390,14 +390,14 @@ async def get_perf_diagnostics():
     """
     from vantage.services.perf import collect_repo_shape, perf_store
 
-    # Collect repo shape stats
+    # Collect repo shape stats (anonymized — no project names)
     repo_shapes = {}
     daemon_cfg = get_daemon_config()
     if daemon_cfg:
-        for repo_cfg in daemon_cfg.repos:
-            repo_shapes[repo_cfg.name] = collect_repo_shape(str(repo_cfg.path))
+        for i, repo_cfg in enumerate(daemon_cfg.repos):
+            repo_shapes[f"repo_{i + 1}"] = collect_repo_shape(str(repo_cfg.path))
     else:
-        repo_shapes["default"] = collect_repo_shape(str(settings.target_repo))
+        repo_shapes["repo_1"] = collect_repo_shape(str(settings.target_repo))
 
     return {
         "requests": {
