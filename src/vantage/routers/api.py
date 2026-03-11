@@ -394,21 +394,12 @@ async def get_perf_diagnostics(include_shape: bool = False):
 
     from vantage.services.perf import collect_repo_shape, perf_store
 
-    result: dict = {
-        "requests": {
-            "total": perf_store.request_count,
-            "by_endpoint": perf_store.by_operation(category="request"),
-        },
-        "services": {
-            "total": perf_store.service_call_count,
-            "by_operation": perf_store.by_operation(category=None),
-        },
-        "slow_requests": perf_store.slow_requests(threshold_ms=200),
-    }
+    loop = asyncio.get_running_loop()
+
+    # Build diagnostics in thread pool so aggregation doesn't block event loop
+    result = await loop.run_in_executor(None, perf_store.build_diagnostics)
 
     if include_shape:
-        # Run in thread pool to avoid blocking the event loop
-        loop = asyncio.get_running_loop()
         repo_shapes: dict = {}
         daemon_cfg = get_daemon_config()
         if daemon_cfg:

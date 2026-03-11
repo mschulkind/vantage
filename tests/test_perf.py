@@ -281,6 +281,26 @@ class TestPerfInfrastructure:
         print(f"  by_operation() on 2K records: {elapsed_ms:.1f}ms")
         assert elapsed_ms < 200
 
+    def test_build_diagnostics_speed(self):
+        from vantage.services.perf import PerfStore, TimingRecord
+
+        store = PerfStore(maxlen=2000)
+        for i in range(2000):
+            store.record(
+                TimingRecord(
+                    category=["request", "git", "fs", "jj"][i % 4],
+                    operation=f"op_{i % 100}",
+                    duration_ms=random.uniform(1, 2000),
+                )
+            )
+        start = time.perf_counter()
+        result = store.build_diagnostics()
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        print(f"  build_diagnostics() full buffer: {elapsed_ms:.1f}ms")
+        assert elapsed_ms < 200
+        assert result["meta"]["buffer_size"] == 2000
+        assert result["requests"]["total"] == 500
+
     def test_collect_repo_shape(self, medium_repo):
         from vantage.services.perf import collect_repo_shape
 
