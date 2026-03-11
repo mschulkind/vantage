@@ -382,24 +382,19 @@ async def get_jj_interdiff(from_rev: str, to_rev: str, path: str | None = None):
 
 
 @router.get("/perf/diagnostics")
-async def get_perf_diagnostics():
+async def get_perf_diagnostics(include_shape: bool = False):
     """Return anonymized performance diagnostics.
 
     Safe to share — contains only timing data and aggregate repo shape
     statistics. No file names, paths, or content are included.
+
+    Set include_shape=true to add repo shape stats (slow for large repos).
     """
+    import asyncio
+
     from vantage.services.perf import collect_repo_shape, perf_store
 
-    # Collect repo shape stats (anonymized — no project names)
-    repo_shapes = {}
-    daemon_cfg = get_daemon_config()
-    if daemon_cfg:
-        for i, repo_cfg in enumerate(daemon_cfg.repos):
-            repo_shapes[f"repo_{i + 1}"] = collect_repo_shape(str(repo_cfg.path))
-    else:
-        repo_shapes["repo_1"] = collect_repo_shape(str(settings.target_repo))
-
-    return {
+    result: dict = {
         "requests": {
             "total": perf_store.request_count,
             "by_endpoint": perf_store.by_operation(category="request"),
@@ -409,8 +404,23 @@ async def get_perf_diagnostics():
             "by_operation": perf_store.by_operation(category=None),
         },
         "slow_requests": perf_store.slow_requests(threshold_ms=200),
-        "repo_shape": repo_shapes,
     }
+
+    if include_shape:
+        # Run in thread pool to avoid blocking the event loop
+        loop = asyncio.get_running_loop()
+        repo_shapes: dict = {}
+        daemon_cfg = get_daemon_config()
+        if daemon_cfg:
+            for i, repo_cfg in enumerate(daemon_cfg.repos):
+                shape = await loop.run_in_executor(None, collect_repo_shape, str(repo_cfg.path))
+                repo_shapes[f"repo_{i + 1}"] = shape
+        else:
+            shape = await loop.run_in_executor(None, collect_repo_shape, str(settings.target_repo))
+            repo_shapes["repo_1"] = shape
+        result["repo_shape"] = repo_shapes
+
+    return result
 
 
 @router.post("/perf/reset")

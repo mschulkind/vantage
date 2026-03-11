@@ -34,21 +34,28 @@ exercise the slow paths, the more useful the data.
 #### Option A: CLI (recommended)
 
 ```bash
-# Default — connects to localhost:8000
+# Timing data only (fast, doesn't block the server)
 vantage perf-report --json > perf-report.json
+
+# Include repo shape stats (slower — walks the file tree in a background thread)
+vantage perf-report --json --shape > perf-report.json
 
 # If running on a different port
 vantage perf-report --port 8200 --json > perf-report.json
 
 # Human-readable summary (for your own review)
 vantage perf-report
-vantage perf-report --port 8200
+vantage perf-report --shape
 ```
 
 #### Option B: Direct API call
 
 ```bash
+# Timing data only (fast)
 curl -s http://localhost:8000/api/perf/diagnostics | python -m json.tool > perf-report.json
+
+# Include repo shape stats
+curl -s 'http://localhost:8000/api/perf/diagnostics?include_shape=true' | python -m json.tool > perf-report.json
 ```
 
 ### Step 3: Share the JSON file
