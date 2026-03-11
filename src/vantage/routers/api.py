@@ -394,8 +394,8 @@ async def get_perf_diagnostics():
     repo_shapes = {}
     daemon_cfg = get_daemon_config()
     if daemon_cfg:
-        for name, repo_cfg in daemon_cfg.repos.items():
-            repo_shapes[name] = collect_repo_shape(str(repo_cfg.path))
+        for repo_cfg in daemon_cfg.repos:
+            repo_shapes[repo_cfg.name] = collect_repo_shape(str(repo_cfg.path))
     else:
         repo_shapes["default"] = collect_repo_shape(str(settings.target_repo))
 
