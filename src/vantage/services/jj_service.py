@@ -3,7 +3,7 @@
 import contextlib
 import logging
 import subprocess
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from vantage.schemas.models import (
@@ -148,7 +148,7 @@ class JJService:
                     break
 
             # Find timestamp (YYYY-MM-DD HH:MM:SS)
-            ts = datetime.now()
+            ts = datetime.now(tz=UTC)
             for j, p in enumerate(parts):
                 if len(p) == 10 and p[4:5] == "-" and p[7:8] == "-":
                     try:
@@ -242,7 +242,7 @@ class JJService:
         change_id = rev
         message = ""
         author = ""
-        ts = datetime.now()
+        ts = datetime.now(tz=UTC)
         if info:
             parts = info.strip().split(_SEP)
             if len(parts) >= 4:
@@ -295,7 +295,7 @@ class JJService:
         change_id = to_rev
         message = f"Changes from {from_rev} to {to_rev}"
         author = ""
-        ts = datetime.now()
+        ts = datetime.now(tz=UTC)
         if info:
             parts = info.strip().split(_SEP)
             if len(parts) >= 4:
@@ -342,22 +342,29 @@ class JJService:
 
     @staticmethod
     def _parse_timestamp(ts_str: str) -> datetime:
-        """Parse a jj timestamp string like '2026-02-28 06:34:03.000 +00:00'."""
+        """Parse a jj timestamp string like '2026-02-28 06:34:03.000 +00:00'.
+
+        Returns a UTC-aware datetime.  jj's ``author.timestamp().utc()``
+        template always emits ``+00:00``, so we parse the offset and
+        convert to UTC.
+        """
         ts_str = ts_str.strip()
-        # Remove timezone offset for simpler parsing
-        if "+" in ts_str or ts_str.endswith("Z"):
-            # Strip timezone
-            for sep in [" +", " -"]:
-                if sep in ts_str[10:]:
-                    ts_str = ts_str[: ts_str.rindex(sep)]
-                    break
-        # Try parsing with/without milliseconds
-        for fmt in ["%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"]:
+        # Try parsing with timezone offset and milliseconds first
+        for fmt in [
+            "%Y-%m-%d %H:%M:%S.%f %z",
+            "%Y-%m-%d %H:%M:%S %z",
+            "%Y-%m-%d %H:%M:%S.%f",
+            "%Y-%m-%d %H:%M:%S",
+        ]:
             try:
-                return datetime.strptime(ts_str, fmt)
+                dt = datetime.strptime(ts_str, fmt)
+                # If parsed without timezone, assume UTC
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                return dt
             except ValueError:
                 continue
-        return datetime.now()
+        return datetime.now(tz=UTC)
 
     @staticmethod
     def _parse_git_diff(raw_diff: str) -> list[DiffHunk]:
