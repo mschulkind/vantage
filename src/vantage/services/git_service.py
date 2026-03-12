@@ -6,7 +6,7 @@ import stat as stat_module
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -141,7 +141,7 @@ class GitService:
                         hexsha=hexsha,
                         author_name=author_name or "Unknown",
                         author_email=author_email or "",
-                        date=datetime.fromtimestamp(int(timestamp_str)),
+                        date=datetime.fromtimestamp(int(timestamp_str), tz=UTC),
                         message=message,
                     )
                 )
@@ -209,7 +209,7 @@ class GitService:
                             hexsha=hexsha,
                             author_name=author_name or "Unknown",
                             author_email=author_email or "",
-                            date=datetime.fromtimestamp(int(ts)),
+                            date=datetime.fromtimestamp(int(ts), tz=UTC),
                             message=message,
                         )
                 elif current_commit:
@@ -386,7 +386,7 @@ class GitService:
                             results.append(
                                 {
                                     "path": line,
-                                    "date": datetime.fromtimestamp(mtime).isoformat(),
+                                    "date": datetime.fromtimestamp(mtime, tz=UTC).isoformat(),
                                     "author_name": "",
                                     "message": "",
                                     "hexsha": "",
@@ -418,7 +418,7 @@ class GitService:
                     results.append(
                         {
                             "path": rel_path,
-                            "date": datetime.fromtimestamp(mtime).isoformat(),
+                            "date": datetime.fromtimestamp(mtime, tz=UTC).isoformat(),
                             "author_name": "",
                             "message": "",
                             "hexsha": "",
@@ -443,7 +443,7 @@ class GitService:
                         results.append(
                             {
                                 "path": rel_path,
-                                "date": datetime.fromtimestamp(mtime).isoformat(),
+                                "date": datetime.fromtimestamp(mtime, tz=UTC).isoformat(),
                                 "author_name": "",
                                 "message": "",
                                 "hexsha": "",
@@ -557,7 +557,7 @@ class GitService:
                         all_results.append(
                             {
                                 "path": entry.name,
-                                "date": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                "date": datetime.fromtimestamp(st.st_mtime, tz=UTC).isoformat(),
                                 "author_name": "",
                                 "message": "",
                                 "hexsha": "",
@@ -588,7 +588,9 @@ class GitService:
                                 all_results.append(
                                     {
                                         "path": rel,
-                                        "date": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                        "date": datetime.fromtimestamp(
+                                            st.st_mtime, tz=UTC
+                                        ).isoformat(),
                                         "author_name": "",
                                         "message": "",
                                         "hexsha": "",
@@ -780,7 +782,7 @@ class GitService:
                 walk_results.append(
                     {
                         "path": rel_path,
-                        "date": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                        "date": datetime.fromtimestamp(st.st_mtime, tz=UTC).isoformat(),
                         "author_name": "",
                         "message": "",
                         "hexsha": "",
@@ -818,7 +820,7 @@ class GitService:
                 results.append(
                     {
                         "path": rel_path,
-                        "date": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                        "date": datetime.fromtimestamp(st.st_mtime, tz=UTC).isoformat(),
                         "author_name": "",
                         "message": "",
                         "hexsha": "",
@@ -864,7 +866,7 @@ class GitService:
                     st = (self.repo_path / rel_path).stat()
                     if not stat_module.S_ISREG(st.st_mode):
                         continue
-                    effective_date = datetime.fromtimestamp(st.st_mtime)
+                    effective_date = datetime.fromtimestamp(st.st_mtime, tz=UTC)
                 except OSError:
                     continue
 
@@ -920,7 +922,7 @@ class GitService:
                         results.append(
                             {
                                 "path": rel_path,
-                                "date": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                "date": datetime.fromtimestamp(st.st_mtime, tz=UTC).isoformat(),
                                 "author_name": "",
                                 "message": "",
                                 "hexsha": "",
@@ -977,7 +979,7 @@ class GitService:
                 commit_hexsha=commit.hexsha,
                 commit_message=str(commit.summary),
                 commit_author=commit.author.name or "Unknown",
-                commit_date=datetime.fromtimestamp(commit.committed_date),
+                commit_date=datetime.fromtimestamp(commit.committed_date, tz=UTC),
                 file_path=path,
                 hunks=hunks,
                 raw_diff=raw_diff,
@@ -1028,7 +1030,7 @@ class GitService:
                 commit_hexsha="working",
                 commit_message=f"Uncommitted changes ({file_status})",
                 commit_author="Working directory",
-                commit_date=datetime.now(),
+                commit_date=datetime.now(tz=UTC),
                 file_path=path,
                 hunks=hunks,
                 raw_diff=raw_diff,
