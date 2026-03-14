@@ -1,10 +1,13 @@
 """Configuration management for multi-repo mode."""
 
+import logging
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
 DEFAULT_CONFIG_PATH = Path("~/.config/vantage/config.toml").expanduser()
+
+logger = logging.getLogger(__name__)
 
 # Directories excluded from file listings and recent-files by default.
 # These are common dependency / build / cache directories that should
@@ -55,6 +58,7 @@ class DaemonConfig:
     """Configuration for daemon mode with multiple repositories."""
 
     repos: list[RepoConfig] = field(default_factory=list)
+    source_dirs: list[Path] = field(default_factory=list)
     host: str | list[str] = "127.0.0.1"
     port: int = 8000
     exclude_dirs: frozenset[str] = DEFAULT_EXCLUDE_DIRS
@@ -88,8 +92,12 @@ class DaemonConfig:
         raw_exclude = data.get("exclude_dirs")
         exclude_dirs = frozenset(raw_exclude) if raw_exclude is not None else DEFAULT_EXCLUDE_DIRS
 
-        return cls(
+        # Parse source_dirs for auto-discovery
+        source_dirs = [Path(p).expanduser().resolve() for p in data.get("source_dirs", [])]
+
+        config = cls(
             repos=repos,
+            source_dirs=source_dirs,
             host=data.get("host", "127.0.0.1"),
             port=data.get("port", 8000),
             exclude_dirs=exclude_dirs,
@@ -98,12 +106,67 @@ class DaemonConfig:
             walk_timeout=data.get("walk_timeout", 30.0),
         )
 
+        if source_dirs:
+            config._discover_repos_from_source_dirs()
+
+        return config
+
+    def _discover_repos_from_source_dirs(self) -> None:
+        """Scan source_dirs for git repos and add any not already configured.
+
+        A subdirectory is considered a repo if it contains a ``.git``
+        directory or file (for worktrees).  Repos whose resolved path
+        already matches an explicit ``[[repos]]`` entry are skipped.
+        Names are derived from the directory name with a numeric suffix
+        added if the name is already taken.
+        """
+        existing_paths = {repo.path.resolve() for repo in self.repos}
+        existing_names = {repo.name for repo in self.repos}
+
+        for source_dir in self.source_dirs:
+            if not source_dir.is_dir():
+                logger.warning("source_dir does not exist or is not a directory: %s", source_dir)
+                continue
+
+            try:
+                entries = sorted(source_dir.iterdir())
+            except OSError:
+                logger.warning("Cannot read source_dir: %s", source_dir)
+                continue
+
+            for entry in entries:
+                if not entry.is_dir():
+                    continue
+                if entry.name.startswith("."):
+                    continue
+
+                git_marker = entry / ".git"
+                if not git_marker.exists():
+                    continue
+
+                resolved = entry.resolve()
+                if resolved in existing_paths:
+                    continue
+
+                # Pick a unique name
+                base_name = entry.name
+                name = base_name
+                counter = 2
+                while name in existing_names:
+                    name = f"{base_name}-{counter}"
+                    counter += 1
+
+                self.repos.append(RepoConfig(name=name, path=resolved))
+                existing_paths.add(resolved)
+                existing_names.add(name)
+                logger.info("Auto-discovered repo: %s → %s", name, resolved)
+
     def validate(self) -> list[str]:
         """Validate the configuration and return a list of errors."""
         errors = []
 
         if not self.repos:
-            errors.append("No repositories configured")
+            errors.append("No repositories configured (add [[repos]] entries or source_dirs)")
 
         names = set()
         for repo in self.repos:
@@ -170,6 +233,13 @@ port = 8000
 # walk_timeout: timeout in seconds for the git ls-files subprocess that
 #   discovers untracked files. Default: 30 seconds.
 # walk_timeout = 30.0
+
+# Source directories: parent directories that are automatically scanned
+# for git repos.  Any subdirectory containing a .git folder is added as
+# a repo (using the directory name).  Repos already listed in [[repos]]
+# are not duplicated.  This is off by default — uncomment to enable.
+#
+# source_dirs = ["~/code", "~/projects"]
 
 # Repositories to serve
 # Each repo needs a unique name (used in URLs) and a path to the directory.
