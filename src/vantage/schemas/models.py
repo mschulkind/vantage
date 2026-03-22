@@ -8,6 +8,7 @@ class RepoInfo(BaseModel):
     """Information about a configured repository."""
 
     name: str
+    last_activity: datetime | None = None
 
 
 class FileNode(BaseModel):

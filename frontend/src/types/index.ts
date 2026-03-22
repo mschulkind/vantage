@@ -1,5 +1,6 @@
 export interface RepoInfo {
   name: string;
+  last_activity: string | null;
 }
 
 export interface FileNode {

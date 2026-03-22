@@ -25,6 +25,7 @@ import {
   Copy,
   Check,
   Github,
+  ArrowDownAZ,
 } from "lucide-react";
 import { RelativeTime } from "../components/RelativeTime";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -75,6 +76,9 @@ export const ViewerPage: React.FC = () => {
     reposLoaded,
     showEmptyDirs,
     setShowEmptyDirs,
+    repoSortMode,
+    setRepoSortMode,
+    sortedRepos,
   } = useRepoStore();
 
   const {
@@ -599,7 +603,33 @@ export const ViewerPage: React.FC = () => {
           {/* Multi-repo mode: show repo list or file tree */}
           {isMultiRepo && !currentRepo ? (
             <div className="space-y-1">
-              {repos.map((repo) => (
+              <div className="flex items-center justify-between px-3 py-1">
+                <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                  Projects
+                </span>
+                <button
+                  onClick={() =>
+                    setRepoSortMode(
+                      repoSortMode === "alphabetical"
+                        ? "recent"
+                        : "alphabetical",
+                    )
+                  }
+                  className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500"
+                  title={
+                    repoSortMode === "alphabetical"
+                      ? "Sort by recent activity"
+                      : "Sort alphabetically"
+                  }
+                >
+                  {repoSortMode === "alphabetical" ? (
+                    <ArrowDownAZ size={14} />
+                  ) : (
+                    <Clock size={14} />
+                  )}
+                </button>
+              </div>
+              {sortedRepos().map((repo) => (
                 <AppLink
                   key={repo.name}
                   to={`/${repo.name}`}
@@ -966,7 +996,7 @@ export const ViewerPage: React.FC = () => {
                   documentation.
                 </p>
                 <div className="flex flex-wrap gap-3 justify-center">
-                  {repos.map((repo) => (
+                  {sortedRepos().map((repo) => (
                     <AppLink
                       key={repo.name}
                       to={`/${repo.name}`}

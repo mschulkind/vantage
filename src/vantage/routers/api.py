@@ -114,7 +114,38 @@ async def list_repos():
     if not daemon_config:
         # Single repo mode - return single repo info
         return [RepoInfo(name="")]
-    return [RepoInfo(name=r.name) for r in daemon_config.repos]
+
+    loop = asyncio.get_event_loop()
+
+    async def _get_last_activity(repo_cfg) -> RepoInfo:
+        """Get last commit timestamp for a repo (fast: 1 commit only)."""
+        try:
+
+            def _last_commit_date():
+                import subprocess
+                from datetime import UTC, datetime
+
+                try:
+                    proc = subprocess.run(
+                        ["git", "log", "-1", "--format=%ct"],
+                        capture_output=True,
+                        text=True,
+                        cwd=str(repo_cfg.path),
+                        timeout=5,
+                    )
+                    if proc.returncode == 0 and proc.stdout.strip():
+                        return datetime.fromtimestamp(int(proc.stdout.strip()), tz=UTC)
+                except Exception:
+                    pass
+                return None
+
+            last = await loop.run_in_executor(None, _last_commit_date)
+            return RepoInfo(name=repo_cfg.name, last_activity=last)
+        except Exception:
+            return RepoInfo(name=repo_cfg.name)
+
+    results = await asyncio.gather(*[_get_last_activity(r) for r in daemon_config.repos])
+    return list(results)
 
 
 # Multi-repo endpoints (when running in daemon mode)

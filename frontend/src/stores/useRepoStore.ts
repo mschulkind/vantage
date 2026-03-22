@@ -8,6 +8,7 @@ interface RepoState {
   repos: RepoInfo[]; // Available repos (empty for single-repo mode)
   isMultiRepo: boolean; // Whether running in multi-repo mode
   reposLoaded: boolean; // Whether repos have been loaded
+  repoSortMode: "alphabetical" | "recent"; // How to sort repos in the list
   fileTree: FileNode[];
   fileContent: FileContent | null;
   currentDirectory: FileNode[] | null;
@@ -19,6 +20,8 @@ interface RepoState {
 
   loadRepos: () => Promise<void>;
   setCurrentRepo: (repo: string | null) => void;
+  setRepoSortMode: (mode: "alphabetical" | "recent") => void;
+  sortedRepos: () => RepoInfo[];
   loadFile: (path: string) => Promise<void>;
   viewDirectory: (path: string) => Promise<void>;
   refreshTree: (path?: string) => Promise<void>;
@@ -86,6 +89,14 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   repos: [],
   isMultiRepo: false,
   reposLoaded: false,
+  repoSortMode: (() => {
+    try {
+      const stored = localStorage.getItem("vantage:repoSortMode");
+      return stored === "recent" ? "recent" : "alphabetical";
+    } catch {
+      return "alphabetical" as const;
+    }
+  })(),
   fileTree: [],
   fileContent: null,
   currentDirectory: null,
@@ -156,6 +167,31 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     });
     // Refresh tree for the new repo
     get().refreshTree();
+  },
+
+  setRepoSortMode: (mode) => {
+    set({ repoSortMode: mode });
+    try {
+      localStorage.setItem("vantage:repoSortMode", mode);
+    } catch {
+      // localStorage may be unavailable
+    }
+  },
+
+  sortedRepos: () => {
+    const { repos, repoSortMode } = get();
+    const sorted = [...repos];
+    if (repoSortMode === "recent") {
+      sorted.sort((a, b) => {
+        if (!a.last_activity && !b.last_activity) return a.name.localeCompare(b.name);
+        if (!a.last_activity) return 1;
+        if (!b.last_activity) return -1;
+        return new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime();
+      });
+    } else {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return sorted;
   },
 
   setCurrentPath: (path) => set({ currentPath: path }),
