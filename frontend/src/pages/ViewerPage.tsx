@@ -26,6 +26,7 @@ import {
   Check,
   Github,
   ArrowDownAZ,
+  FolderGit2,
 } from "lucide-react";
 import { RelativeTime } from "../components/RelativeTime";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -540,17 +541,21 @@ export const ViewerPage: React.FC = () => {
   const breadcrumbs =
     currentPath && currentPath !== "." ? currentPath.split("/") : [];
 
+  // Whether to show the sidebar (hide on repo picker page)
+  const showSidebar = !(isMultiRepo && !currentRepo);
+
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden text-slate-900 dark:text-slate-100">
       {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
+      {showSidebar && sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - hidden on repo picker page */}
+      {showSidebar && (
       <div
         className={cn(
           "w-72 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-800 shadow-sm",
@@ -600,63 +605,10 @@ export const ViewerPage: React.FC = () => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto py-2 px-2">
-          {/* Multi-repo mode: show repo list or file tree */}
-          {isMultiRepo && !currentRepo ? (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between px-3 py-1">
-                <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                  Projects
-                </span>
-                <button
-                  onClick={() =>
-                    setRepoSortMode(
-                      repoSortMode === "alphabetical"
-                        ? "recent"
-                        : "alphabetical",
-                    )
-                  }
-                  className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500"
-                  title={
-                    repoSortMode === "alphabetical"
-                      ? "Sort by recent activity"
-                      : "Sort alphabetically"
-                  }
-                >
-                  {repoSortMode === "alphabetical" ? (
-                    <ArrowDownAZ size={14} />
-                  ) : (
-                    <Clock size={14} />
-                  )}
-                </button>
-              </div>
-              {sortedRepos().map((repo) => (
-                <AppLink
-                  key={repo.name}
-                  to={`/${repo.name}`}
-                  onBeforeNavigate={() => {
-                    setCurrentRepo(repo.name);
-                  }}
-                  className={cn(
-                    "flex items-center py-2 px-3 rounded-md text-sm transition-all duration-150 no-underline",
-                    "hover:bg-slate-100 dark:hover:bg-slate-700",
-                  )}
-                >
-                  <Database size={16} className="mr-2 text-blue-500 shrink-0" />
-                  <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
-                    {repo.name}
-                  </span>
-                  {repoSortMode === "recent" && repo.last_activity && (
-                    <span className="ml-auto pl-2 text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
-                      <RelativeTime date={repo.last_activity} />
-                    </span>
-                  )}
-                </AppLink>
-              ))}
-            </div>
-          ) : (
-            <>
-              {/* Show current repo name with back button in multi-repo mode */}
-              {isMultiRepo && currentRepo && (
+          {/* File tree (sidebar only shows when a repo is selected) */}
+          <>
+            {/* Show current repo name with back button in multi-repo mode */}
+            {isMultiRepo && currentRepo && (
                 <AppLink
                   to="/"
                   onBeforeNavigate={() => {
@@ -669,9 +621,8 @@ export const ViewerPage: React.FC = () => {
                   <span className="font-medium">{currentRepo}</span>
                 </AppLink>
               )}
-              <FileTree nodes={fileTree} />
-            </>
-          )}
+            <FileTree nodes={fileTree} />
+          </>
         </div>
         {/* Recent Files Section - always visible, with spinner when loading */}
         {(!isMultiRepo || currentRepo) && (
@@ -748,10 +699,12 @@ export const ViewerPage: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-slate-900 min-w-0">
-        {/* Header / Breadcrumbs */}
+        {/* Header / Breadcrumbs - hidden on repo picker page */}
+        {showSidebar ? (
         <div className="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center px-3 md:px-6 justify-between shrink-0 bg-white dark:bg-slate-800 gap-2">
           <div className="flex items-center min-w-0 gap-2">
             <button
@@ -913,6 +866,7 @@ export const ViewerPage: React.FC = () => {
             </div>
           ) : null}
         </div>
+        ) : null}
 
         {/* Viewer */}
         <div
@@ -989,18 +943,50 @@ export const ViewerPage: React.FC = () => {
                 currentPath={currentPath || "."}
               />
             ) : isMultiRepo && !currentRepo ? (
-              <div className="flex flex-col items-center justify-center h-96 text-slate-400">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center mb-6">
-                  <Database size={40} className="text-blue-500" />
+              <div className="max-w-2xl mx-auto w-full py-12 md:py-16">
+                <div className="flex items-end justify-between mb-8">
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+                      Projects
+                    </h1>
+                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+                      {repos.length} {repos.length === 1 ? "repository" : "repositories"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setRepoSortMode(
+                        repoSortMode === "alphabetical"
+                          ? "recent"
+                          : "alphabetical",
+                      )
+                    }
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                      "border border-slate-200 dark:border-slate-700",
+                      "text-slate-500 dark:text-slate-400",
+                      "hover:bg-slate-50 dark:hover:bg-slate-800",
+                    )}
+                    title={
+                      repoSortMode === "alphabetical"
+                        ? "Sort by recent activity"
+                        : "Sort alphabetically"
+                    }
+                  >
+                    {repoSortMode === "alphabetical" ? (
+                      <>
+                        <ArrowDownAZ size={14} />
+                        <span>A–Z</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={14} />
+                        <span>Recent</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-                <p className="text-xl font-semibold text-slate-600 dark:text-slate-200 mb-2">
-                  Welcome to Vantage
-                </p>
-                <p className="text-sm text-slate-400 mb-6 text-center max-w-md">
-                  Select a repository from the sidebar to browse your Markdown
-                  documentation.
-                </p>
-                <div className="flex flex-wrap gap-3 justify-center">
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800/50 shadow-sm divide-y divide-slate-100 dark:divide-slate-700/50">
                   {sortedRepos().map((repo) => (
                     <AppLink
                       key={repo.name}
@@ -1008,12 +994,22 @@ export const ViewerPage: React.FC = () => {
                       onBeforeNavigate={() => {
                         setCurrentRepo(repo.name);
                       }}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-all shadow-sm no-underline"
+                      className={cn(
+                        "flex items-center gap-3 px-5 py-4 no-underline transition-colors group",
+                        "hover:bg-blue-50/50 dark:hover:bg-slate-700/40",
+                      )}
                     >
-                      <Database size={16} className="text-blue-500" />
-                      {repo.name}
-                      {repoSortMode === "recent" && repo.last_activity && (
-                        <span className="text-xs text-slate-400 dark:text-slate-500">
+                      <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+                        <FolderGit2
+                          size={18}
+                          className="text-blue-500 dark:text-blue-400"
+                        />
+                      </div>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate text-[15px]">
+                        {repo.name}
+                      </span>
+                      {repo.last_activity && (
+                        <span className="ml-auto pl-4 text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0 tabular-nums">
                           <RelativeTime date={repo.last_activity} />
                         </span>
                       )}
