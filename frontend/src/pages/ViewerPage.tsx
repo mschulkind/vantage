@@ -641,10 +641,15 @@ export const ViewerPage: React.FC = () => {
                     "hover:bg-slate-100 dark:hover:bg-slate-700",
                   )}
                 >
-                  <Database size={16} className="mr-2 text-blue-500" />
-                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                  <Database size={16} className="mr-2 text-blue-500 shrink-0" />
+                  <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
                     {repo.name}
                   </span>
+                  {repoSortMode === "recent" && repo.last_activity && (
+                    <span className="ml-auto pl-2 text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
+                      <RelativeTime date={repo.last_activity} />
+                    </span>
+                  )}
                 </AppLink>
               ))}
             </div>
@@ -1007,6 +1012,11 @@ export const ViewerPage: React.FC = () => {
                     >
                       <Database size={16} className="text-blue-500" />
                       {repo.name}
+                      {repoSortMode === "recent" && repo.last_activity && (
+                        <span className="text-xs text-slate-400 dark:text-slate-500">
+                          <RelativeTime date={repo.last_activity} />
+                        </span>
+                      )}
                     </AppLink>
                   ))}
                 </div>
