@@ -29,7 +29,7 @@ vantage init-config --path ~/my-vantage-config.toml
 host = "127.0.0.1"
 port = 8000
 
-# Directories to serve (each appears in the sidebar)
+# Directories to serve (each appears in the project list)
 [[repos]]
 name = "notes"
 path = "~/Documents/notes"
@@ -47,15 +47,44 @@ Each directory is accessible at `http://localhost:8000/{name}/`.
 
 ## Reference
 
-| Key            | Type    | Default       | Description                           |
-| -------------- | ------- | ------------- | ------------------------------------- |
-| `host`         | string  | `"127.0.0.1"` | Server bind address                   |
-| `port`         | integer | `8000`        | Server port                           |
-| `repos`        | array   | `[]`          | List of directories to serve          |
-| `repos[].name` | string  | _required_    | Display name and URL slug             |
-| `repos[].path` | string  | _required_    | Path to the directory (supports `~`)  |
-| `exclude_dirs` | array   | _(see below)_ | Directories to hide from all listings |
-| `show_hidden`  | boolean | `true`        | Show hidden files/directories (dotfiles) in the sidebar |
+| Key                        | Type             | Default       | Description                                          |
+| -------------------------- | ---------------- | ------------- | ---------------------------------------------------- |
+| `host`                     | string           | `"127.0.0.1"` | Server bind address                                  |
+| `port`                     | integer          | `8000`        | Server port                                          |
+| `repos`                    | array            | `[]`          | List of directories to serve                         |
+| `repos[].name`             | string           | _required_    | Display name and URL slug                            |
+| `repos[].path`             | string           | _required_    | Path to the directory (supports `~`)                 |
+| `repos[].allowed_read_roots` | array of strings | `[]`        | Additional directories this repo may read (see below) |
+| `source_dirs`              | array of strings | `[]`          | Parent directories to scan for git repos (see below) |
+| `exclude_dirs`             | array of strings | _(see below)_ | Directories to hide from all listings                |
+| `show_hidden`              | boolean          | `true`        | Show hidden files/directories (dotfiles) in the sidebar |
+| `walk_max_depth`           | integer or null  | `null` (unlimited) | Max directory depth for untracked file discovery |
+| `walk_timeout`             | float            | `30.0`        | Timeout in seconds for git ls-files subprocess       |
+
+## Source Directory Auto-Discovery
+
+Instead of listing every repo by hand, you can point Vantage at one or more parent directories. Any subdirectory containing a `.git` folder is automatically added as a project:
+
+```toml
+source_dirs = ["~/code", "~/projects"]
+```
+
+Auto-discovered repos use the directory name as their display name. If a repo is already listed explicitly in `[[repos]]` (by matching its resolved path), it is skipped — so you can mix manual entries with auto-discovery without duplicates. If two discovered repos would have the same name, a numeric suffix is added (e.g., `my-project-2`).
+
+This feature is **off by default** — add `source_dirs` to your config to enable it.
+
+## Allowed Read Roots
+
+By default, each repo can only read files within its own directory. If you need Vantage to follow symlinks or include files from outside the repo root, add `allowed_read_roots` to that repo:
+
+```toml
+[[repos]]
+name = "my-project"
+path = "~/code/my-project"
+allowed_read_roots = ["~/.dotfiles/gemini/skills"]
+```
+
+This allows Vantage to read files under `~/.dotfiles/gemini/skills` when serving `my-project`, but only that repo has access.
 
 ## Excluded Directories
 
@@ -70,6 +99,20 @@ exclude_dirs = ["node_modules", ".venv", "vendor", "dist", "build"]
 ```
 
 Setting `exclude_dirs` replaces the default list entirely — include everything you want hidden.
+
+## Performance Tuning
+
+For very large repositories with deep directory trees, two settings control how Vantage discovers untracked Markdown files:
+
+```toml
+# Limit scan depth (default: unlimited)
+walk_max_depth = 5
+
+# Timeout for git ls-files subprocess (default: 30 seconds)
+walk_timeout = 30.0
+```
+
+These settings only affect the discovery of files not tracked by Git. Tracked files are always shown regardless of depth. In most cases the defaults work fine — adjust these only if you notice slow response times in large repos.
 
 ## Environment Variables
 

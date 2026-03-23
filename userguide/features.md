@@ -139,4 +139,33 @@ Press **?** to see all keyboard shortcuts, including sidebar toggle (**b**), vim
 
 ## Multi-Repo Mode
 
-When running in daemon mode with multiple directories, the sidebar shows a repo selector at the top. Switch between directories without restarting the server. See [Daemon Mode](daemon-mode.md) for details.
+When running in daemon mode with multiple directories, Vantage shows a full-page project list where you can select a repo. Projects can be sorted alphabetically or by recent activity (with relative timestamps like "2 hours ago"). Switch between directories without restarting the server. See [Daemon Mode](daemon-mode.md) for details.
+
+### Source Directory Auto-Discovery
+
+Instead of manually listing every repository, you can point Vantage at parent directories. Any subdirectory containing a `.git` folder is automatically added as a project:
+
+```toml
+source_dirs = ["~/code", "~/projects"]
+```
+
+Manually listed `[[repos]]` take precedence — duplicates are skipped. See [Configuration](configuration.md#source-directory-auto-discovery) for details.
+
+## Jujutsu (jj) Support
+
+If a repository uses [Jujutsu](https://martinvonz.github.io/jj/) as its version control system, Vantage provides additional integration:
+
+- **Revision log** — View the jj revision history for any file
+- **Evolution log** — See the evolution history of a revision
+- **Diffs** — View changes in any revision
+- **Interdiff** — Compare two revisions side-by-side
+
+Jujutsu support is automatic — if a repo has a `.jj` directory, the jj-specific features appear alongside the standard Git integration.
+
+## Dark Mode
+
+Press **Shift+D** to toggle between light and dark themes. The setting is persisted across sessions.
+
+## Performance Diagnostics
+
+Vantage includes built-in performance instrumentation. Run `vantage perf-report` against a running instance to see anonymized timing data for all API endpoints. See the [CLI Reference](cli-reference.md#vantage-perf-report) for details.
