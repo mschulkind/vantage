@@ -11,6 +11,7 @@ Vantage supports keyboard shortcuts for fast navigation. Press `?` at any time t
 | `b`       | Toggle the sidebar                                            |
 | `h`       | Open commit history for the current file                      |
 | `d`       | View the latest diff for the current file                     |
+| `y`       | Copy the absolute file path to clipboard                      |
 | `Shift+D` | Toggle dark mode                                              |
 | `j`       | Scroll down                                                   |
 | `k`       | Scroll up                                                     |

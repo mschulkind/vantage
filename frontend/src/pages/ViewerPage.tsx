@@ -96,6 +96,7 @@ export const ViewerPage: React.FC = () => {
     isRecentLoading,
     fetchRecentFiles,
     repoName,
+    repoRootPath,
     fetchRepoInfo,
     history,
     fetchHistory,
@@ -111,6 +112,7 @@ export const ViewerPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pathCopied, setPathCopied] = useState(false);
   const [keyboardShortcutsEnabled, setKeyboardShortcutsEnabled] =
     useState<boolean>(() => {
       try {
@@ -452,12 +454,21 @@ export const ViewerPage: React.FC = () => {
       navigate(historyPath);
     }
   }, [currentPath, history, isMultiRepo, currentRepo, navigate]);
+  const handleCopyPath = useCallback(() => {
+    if (!repoRootPath || !currentPath) return;
+    const absolutePath = `${repoRootPath}/${currentPath}`;
+    navigator.clipboard.writeText(absolutePath).then(() => {
+      setPathCopied(true);
+      setTimeout(() => setPathCopied(false), 2000);
+    });
+  }, [repoRootPath, currentPath]);
   const { shortcutsOpen, setShortcutsOpen } = useKeyboardShortcuts({
     onOpenFilePicker: handleOpenFilePicker,
     onToggleSidebar: handleToggleSidebar,
     onNavigate: handleShortcutNavigate,
     onViewDiff: handleViewDiff,
     onViewHistory: handleViewHistory,
+    onCopyPath: handleCopyPath,
     contentScrollRef: contentRef,
     isMultiRepo,
     currentRepo,
@@ -809,6 +820,16 @@ export const ViewerPage: React.FC = () => {
                     </span>
                   </AppLink>
                 )}
+              {currentPath && repoRootPath && (
+                <button
+                  onClick={handleCopyPath}
+                  className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors cursor-pointer"
+                  title={`Copy absolute path: ${repoRootPath}/${currentPath}`}
+                >
+                  {pathCopied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                  <span className="hidden sm:inline">{pathCopied ? "Copied!" : "Path"}</span>
+                </button>
+              )}
               {currentPath && currentPath.toLowerCase().endsWith(".md") && (
                 <button
                   onClick={() => { setShowRaw((v) => !v); setCopied(false); }}
@@ -849,6 +870,16 @@ export const ViewerPage: React.FC = () => {
                   <span className="text-slate-300 dark:text-slate-600">·</span>
                   <span className="text-slate-400 dark:text-slate-500">{formatDateTime(fileMtime)}</span>
                 </div>
+              )}
+              {currentPath && repoRootPath && (
+                <button
+                  onClick={handleCopyPath}
+                  className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors cursor-pointer"
+                  title={`Copy absolute path: ${repoRootPath}/${currentPath}`}
+                >
+                  {pathCopied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                  <span className="hidden sm:inline">{pathCopied ? "Copied!" : "Path"}</span>
+                </button>
               )}
               <button
                 onClick={() => { setShowRaw((v) => !v); setCopied(false); }}

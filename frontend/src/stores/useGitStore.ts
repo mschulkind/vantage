@@ -26,6 +26,7 @@ interface GitState {
   isRecentLoading: boolean;
   recentFilesError: boolean;
   repoName: string | null;
+  repoRootPath: string | null;
 
   fetchHistory: (path: string) => Promise<void>;
   fetchStatus: (path: string) => Promise<void>;
@@ -52,6 +53,7 @@ export const useGitStore = create<GitState>((set) => ({
   isRecentLoading: false,
   recentFilesError: false,
   repoName: null,
+  repoRootPath: null,
 
   fetchHistory: async (path) => {
     const apiBase = getApiBase();
@@ -160,10 +162,10 @@ export const useGitStore = create<GitState>((set) => ({
     const apiBase = getApiBase();
     if (!apiBase) return;
     try {
-      const response = await axios.get<{ name: string }>(`${apiBase}/info`);
-      set({ repoName: response.data.name });
+      const response = await axios.get<{ name: string; root_path: string }>(`${apiBase}/info`);
+      set({ repoName: response.data.name, repoRootPath: response.data.root_path });
     } catch {
-      set({ repoName: null });
+      set({ repoName: null, repoRootPath: null });
     }
   },
 }));

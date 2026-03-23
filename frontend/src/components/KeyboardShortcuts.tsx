@@ -33,6 +33,7 @@ const shortcutGroups: ShortcutGroup[] = [
       { keys: ["Shift", "G"], description: "Scroll to bottom" },
       { keys: ["d"], description: "View latest diff" },
       { keys: ["h"], description: "View file history" },
+      { keys: ["y"], description: "Copy absolute file path" },
     ],
   },
   {
