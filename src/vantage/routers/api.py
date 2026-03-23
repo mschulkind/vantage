@@ -227,7 +227,7 @@ async def get_recent_files_multi(repo: str, limit: int = 10):
 @router.get("/r/{repo}/info")
 async def get_repo_info_multi(repo: str):
     git = get_git_service(repo)
-    return {"name": git.get_repo_name()}
+    return {"name": git.get_repo_name(), "root_path": str(git.repo_path)}
 
 
 @router.get("/r/{repo}/files", response_model=list[str])
@@ -341,7 +341,7 @@ async def get_recent_files(limit: int = 10):
 async def get_repo_info():
     _require_single_repo_mode()
     git = get_git_service()
-    return {"name": git.get_repo_name()}
+    return {"name": git.get_repo_name(), "root_path": str(git.repo_path)}
 
 
 @router.get("/files", response_model=list[str])

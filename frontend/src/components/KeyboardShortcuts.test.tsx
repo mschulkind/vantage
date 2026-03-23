@@ -33,6 +33,9 @@ describe("KeyboardShortcutsModal", () => {
     expect(screen.getByText("Show this help")).toBeInTheDocument();
     expect(screen.getByText("Scroll down")).toBeInTheDocument();
     expect(screen.getByText("View latest diff")).toBeInTheDocument();
+    expect(
+      screen.getByText("Copy absolute file path"),
+    ).toBeInTheDocument();
   });
 
   it("calls onClose when Escape is pressed", () => {

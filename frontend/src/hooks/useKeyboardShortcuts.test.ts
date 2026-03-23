@@ -10,6 +10,7 @@ describe("useKeyboardShortcuts", () => {
     onNavigate: vi.fn(),
     onViewDiff: vi.fn(),
     onViewHistory: vi.fn(),
+    onCopyPath: vi.fn(),
     contentScrollRef: {
       current: null,
     } as React.RefObject<HTMLDivElement | null>,
@@ -53,6 +54,12 @@ describe("useKeyboardShortcuts", () => {
     renderHook(() => useKeyboardShortcuts(mockCallbacks));
     fireKey("h");
     expect(mockCallbacks.onViewHistory).toHaveBeenCalled();
+  });
+
+  it("calls onCopyPath on y key", () => {
+    renderHook(() => useKeyboardShortcuts(mockCallbacks));
+    fireKey("y");
+    expect(mockCallbacks.onCopyPath).toHaveBeenCalled();
   });
 
   it("navigates home on g then h sequence", async () => {
