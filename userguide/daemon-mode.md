@@ -35,6 +35,27 @@ path = "~/projects/docs"
 
 The `name` is used in URLs — for example, `http://localhost:8000/notes/readme.md`.
 
+### Alternative: Auto-Discover from Source Directories
+
+Instead of listing every repo by hand, you can point Vantage at parent directories that contain git repos:
+
+```toml
+# ~/.config/vantage/config.toml
+
+host = "127.0.0.1"
+port = 8000
+
+# Automatically discover all git repos under these directories
+source_dirs = ["~/code", "~/projects"]
+
+# You can still add specific repos alongside auto-discovery
+[[repos]]
+name = "notes"
+path = "~/Documents/notes"
+```
+
+Any subdirectory of `source_dirs` that contains a `.git` folder is added automatically, using the directory name. Repos already listed in `[[repos]]` are not duplicated. See [Configuration](configuration.md#source-directory-auto-discovery) for details.
+
 ### 3. Start the daemon
 
 ```bash

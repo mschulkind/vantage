@@ -84,3 +84,40 @@ vantage install-service
 ```
 
 This creates `~/.config/systemd/user/vantage.service`. See [Daemon Mode](daemon-mode.md#running-as-a-systemd-service) for the full setup steps.
+
+---
+
+## `vantage perf-report`
+
+Collect and display performance diagnostics from a running Vantage instance. Connects to the Vantage server API and retrieves anonymized timing data — safe to share (no file names, project names, or content).
+
+```bash
+vantage perf-report [--host HOST] [--port PORT] [--json] [--shape] [--reset]
+```
+
+| Option    | Default       | Description                                            |
+| --------- | ------------- | ------------------------------------------------------ |
+| `--host`  | `127.0.0.1`  | Vantage server host                                    |
+| `--port`  | `8000`        | Vantage server port                                    |
+| `--json`  |               | Output raw JSON instead of a formatted report          |
+| `--shape` |               | Include repo shape stats (can be slow for large repos) |
+| `--reset` |               | Reset performance counters after collecting            |
+
+### Examples
+
+```bash
+# Quick timing report from a local instance
+vantage perf-report
+
+# Include repo shape stats (file counts, depth)
+vantage perf-report --shape
+
+# Export JSON for sharing or analysis
+vantage perf-report --json > perf.json
+
+# Connect to a remote instance
+vantage perf-report --host 192.168.1.50 --port 9000
+
+# Collect and reset counters
+vantage perf-report --json --reset > perf.json
+```

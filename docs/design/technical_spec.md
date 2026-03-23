@@ -87,12 +87,24 @@ We use Pydantic models for type-safe communication.
 
 ### 2.2 Configuration
 
-Configuration is managed via `pydantic-settings` in `src/settings.py`.
+Configuration is managed via `pydantic-settings` in `src/settings.py` and `src/config.py`.
 
-- **Environment Variables / CLI Args:**
+- **Environment Variables / CLI Args (single-repo mode):**
   - `TARGET_REPO`: Path to the repository to view (default: current directory).
   - `HOST`: Server host (default: `127.0.0.1`).
   - `PORT`: Server port (default: `8000`).
+
+- **Config File (daemon mode, `~/.config/vantage/config.toml`):**
+  - `host`, `port`: Server bind settings.
+  - `repos[]`: Explicit repo list with `name`, `path`, and optional `allowed_read_roots`.
+  - `source_dirs`: Parent directories to scan for git repos (auto-discovery).
+  - `exclude_dirs`: Directories hidden from all listings (overrides defaults).
+  - `show_hidden`: Whether to show dotfiles in the sidebar.
+  - `walk_max_depth`: Max directory depth for untracked file discovery (default: unlimited).
+  - `walk_timeout`: Timeout in seconds for git ls-files subprocess (default: 30.0).
+
+- **Source Directory Auto-Discovery (`config.py`):**
+  - `_discover_repos_from_source_dirs()`: Scans each `source_dirs` entry for subdirectories containing `.git`. Skips repos whose resolved path matches an existing `[[repos]]` entry. Assigns unique names with numeric suffix if collisions occur.
 
 ### 2.3 Services (`src/services/`)
 
@@ -140,16 +152,26 @@ Configuration is managed via `pydantic-settings` in `src/settings.py`.
 ### 2.4 API Routes (`src/routers/`)
 
 - **`api.py`**:
+  - `GET /api/health`: Health check endpoint.
+  - `GET /api/version`: Server version info.
+  - `GET /api/repos`: List configured repositories (daemon mode).
   - `GET /api/tree`: Calls `FileSystemService.list_directory`.
   - `GET /api/content`: Calls `FileSystemService.read_file`.
+  - `GET /api/files`: List all Markdown files.
+  - `GET /api/info`: Repository metadata.
   - `GET /api/git/history`: Calls `GitService.get_history`.
   - `GET /api/git/status`: Returns `FileStatus` (last commit + git working tree status).
+  - `GET /api/git/diff`: Returns diff for a specific commit.
   - `GET /api/git/diff/working?path=`: Returns uncommitted diff for a file.
+  - `GET /api/git/recent?limit=`: Recently changed files by git commit date.
   - `GET /api/jj/info`: Returns `JJInfo` (jj detection + working copy ID).
   - `GET /api/jj/log?path=&limit=`: Returns `list[JJRevision]`.
   - `GET /api/jj/evolog?rev=&limit=`: Returns `list[JJEvoEntry]`.
   - `GET /api/jj/diff?rev=&path=`: Returns `FileDiff` for a jj revision.
-  - All endpoints above also exist under `/api/r/{repo}/...` for multi-repo mode.
+  - `GET /api/jj/interdiff?from_rev=&to_rev=&path=`: Diff between two jj revisions.
+  - `GET /api/perf/diagnostics`: Anonymized performance timing data.
+  - `POST /api/perf/reset`: Reset performance counters.
+  - All file/git/jj endpoints also exist under `/api/r/{repo}/...` for multi-repo mode.
 - **`socket.py`**:
   - `WS /api/ws`: Handshake -> Add to `ConnectionManager` -> Await disconnect.
 
@@ -166,8 +188,11 @@ We will use `zustand` for cleaner state management than React Context.
   - `fileTree`: FileNode[]
   - `fileContent`: string | null
   - `isLoading`: boolean
+  - `repoSortMode`: "alpha" | "recent" (persisted to localStorage)
   - `refreshTree()`: Re-fetch tree structure.
   - `loadFile(path)`: Fetch content + update URL.
+  - `sortedRepos()`: Returns repos sorted by current mode (name or last_activity).
+  - `setRepoSortMode(mode)`: Switch sort mode.
 - **`useGitStore`**
   - `history`: GitCommit[]
   - `latestCommit`: GitCommit | null
