@@ -1,5 +1,6 @@
 import os
 import sys
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 import click
@@ -8,6 +9,14 @@ import uvicorn
 from vantage.config import DEFAULT_CONFIG_PATH, DaemonConfig, create_example_config
 
 _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def _get_version() -> str:
+    """Get the installed package version."""
+    try:
+        return pkg_version("vantage")
+    except Exception:
+        return "unknown"
 
 
 def _warn_nonlocal(host: str | list[str]) -> None:
@@ -24,6 +33,7 @@ def _warn_nonlocal(host: str | list[str]) -> None:
 
 
 @click.group(invoke_without_command=True)
+@click.version_option(version=_get_version(), prog_name="vantage")
 @click.pass_context
 def cli(ctx):
     """Vantage: View LLM-generated Markdown files with GitHub-like rendering."""
@@ -277,7 +287,13 @@ WantedBy=default.target
     default=None,
     help="Name for the repository (defaults to directory name)",
 )
-def build(repo_path: str, output: str, frontend_dist: str | None, name: str | None):
+@click.option(
+    "--base-path",
+    type=str,
+    default="/",
+    help="URL base path for deployment (e.g., /docs/). Currently unused — assets use relative paths.",
+)
+def build(repo_path: str, output: str, frontend_dist: str | None, name: str | None, base_path: str):  # noqa: ARG001
     """Build a static site from a markdown repository.
 
     This generates a fully self-contained static site with pre-rendered

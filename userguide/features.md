@@ -135,6 +135,14 @@ The sidebar displays a file tree with:
 
 Press **t** to open the fuzzy file picker. Type to search across all files in the project. Use arrow keys to navigate and Enter to select.
 
+### Global Search
+
+Press **Shift+T** from anywhere to search files across all projects at once. On the project picker page, **t** also opens the global file search.
+
+Press **r** to search recent files in the current project, or **Shift+R** to search recent files across all projects.
+
+Press **Shift+P** to open the project picker and quickly switch between repos.
+
 Press **?** to see all keyboard shortcuts, including sidebar toggle (**b**), vim-style scrolling (**j**/**k**), and quick navigation (**g h** for home, **g r** for recent files).
 
 ## Multi-Repo Mode
@@ -161,6 +169,14 @@ If a repository uses [Jujutsu](https://martinvonz.github.io/jj/) as its version 
 - **Interdiff** — Compare two revisions side-by-side
 
 Jujutsu support is automatic — if a repo has a `.jj` directory, the jj-specific features appear alongside the standard Git integration.
+
+## What's New
+
+Vantage includes a built-in changelog. When a new version introduces features, a "What's New" popup appears on your next visit. You can:
+
+- **Dismiss** — click "Got it" to close (it won't show again for this version)
+- **Opt out** — check "Don't show automatically" to never see auto-popups
+- **View manually** — open Settings (gear icon) → "What's New" anytime
 
 ## Dark Mode
 

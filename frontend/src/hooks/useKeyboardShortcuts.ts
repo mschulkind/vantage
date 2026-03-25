@@ -8,6 +8,10 @@ import React, { useEffect, useState, useCallback } from "react";
  */
 export const useKeyboardShortcuts = ({
   onOpenFilePicker,
+  onOpenGlobalFilePicker,
+  onOpenProjectPicker,
+  onOpenRecentFiles,
+  onOpenGlobalRecentFiles,
   onToggleSidebar,
   onNavigate,
   onViewDiff,
@@ -19,6 +23,10 @@ export const useKeyboardShortcuts = ({
   enabled,
 }: {
   onOpenFilePicker: () => void;
+  onOpenGlobalFilePicker: () => void;
+  onOpenProjectPicker: () => void;
+  onOpenRecentFiles: () => void;
+  onOpenGlobalRecentFiles: () => void;
   onToggleSidebar: () => void;
   onNavigate: (path: string) => void;
   onViewDiff: () => void;
@@ -112,6 +120,30 @@ export const useKeyboardShortcuts = ({
         case "t":
           // Handled by ViewerPage's existing listener — don't double-fire
           break;
+        case "T":
+          if (e.shiftKey) {
+            e.preventDefault();
+            onOpenGlobalFilePicker();
+          }
+          break;
+        case "P":
+          if (e.shiftKey) {
+            e.preventDefault();
+            onOpenProjectPicker();
+          }
+          break;
+        case "r":
+          if (!e.shiftKey) {
+            e.preventDefault();
+            onOpenRecentFiles();
+          }
+          break;
+        case "R":
+          if (e.shiftKey) {
+            e.preventDefault();
+            onOpenGlobalRecentFiles();
+          }
+          break;
         case "b":
           e.preventDefault();
           onToggleSidebar();
@@ -176,6 +208,10 @@ export const useKeyboardShortcuts = ({
     shortcutsOpen,
     clearPending,
     onOpenFilePicker,
+    onOpenGlobalFilePicker,
+    onOpenProjectPicker,
+    onOpenRecentFiles,
+    onOpenGlobalRecentFiles,
     onToggleSidebar,
     onNavigate,
     onViewDiff,

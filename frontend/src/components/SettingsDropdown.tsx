@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Settings, Sun, Moon, FolderOpen, Keyboard } from "lucide-react";
+import { Settings, Sun, Moon, FolderOpen, Keyboard, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 
 type Theme = "light" | "dark";
@@ -34,6 +34,7 @@ interface SettingsDropdownProps {
   onShowEmptyDirsChange: (show: boolean) => void;
   keyboardShortcutsEnabled: boolean;
   onKeyboardShortcutsEnabledChange: (enabled: boolean) => void;
+  onOpenWhatsNew?: () => void;
 }
 
 export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
@@ -41,6 +42,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   onShowEmptyDirsChange,
   keyboardShortcutsEnabled,
   onKeyboardShortcutsEnabledChange,
+  onOpenWhatsNew,
 }) => {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(getStoredTheme);
@@ -167,6 +169,21 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
               </div>
             </label>
           </div>
+
+          {onOpenWhatsNew && (
+            <>
+              <div className="h-px bg-slate-100 dark:bg-slate-700 mx-2 my-1" />
+              <div className="px-3 py-2">
+                <button
+                  onClick={() => { onOpenWhatsNew(); setOpen(false); }}
+                  className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white w-full text-left py-1"
+                >
+                  <Sparkles size={13} />
+                  What's New
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

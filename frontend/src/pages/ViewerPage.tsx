@@ -6,6 +6,10 @@ import { MarkdownViewer } from "../components/MarkdownViewer";
 import { DirectoryViewer } from "../components/DirectoryViewer";
 import { DiffViewer } from "../components/DiffViewer";
 import { FilePicker } from "../components/FilePicker";
+import type { GlobalFile } from "../components/FilePicker";
+import { ProjectPicker } from "../components/ProjectPicker";
+import { WhatsNewModal } from "../components/WhatsNewModal";
+import { useWhatsNew } from "../hooks/useWhatsNew";
 import { AppLink } from "../components/AppLink";
 import { useWebSocket } from "../hooks/useWebSocket";
 import {
@@ -107,8 +111,11 @@ export const ViewerPage: React.FC = () => {
   const contentRef = useRef<HTMLDivElement>(null);
   const prevPathRef = useRef<string | null>(null);
   const [filePickerOpen, setFilePickerOpen] = useState(false);
+  const [globalFilePickerOpen, setGlobalFilePickerOpen] = useState(false);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [recentsModalOpen, setRecentsModalOpen] = useState(false);
   const [allFiles, setAllFiles] = useState<string[]>([]);
+  const [globalFiles, setGlobalFiles] = useState<GlobalFile[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -133,6 +140,8 @@ export const ViewerPage: React.FC = () => {
 
   useWebSocket();
 
+  const whatsNew = useWhatsNew();
+
   // Helper to get API base
   const getApiBase = useCallback((): string => {
     const { currentRepo: cr, isMultiRepo: imr } = useRepoStore.getState();
@@ -151,60 +160,15 @@ export const ViewerPage: React.FC = () => {
     [isMultiRepo, currentRepo],
   );
 
-  // File picker select handler
+  // Load repos on mount
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if typing in an input/textarea, or if modifier keys are held
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      )
-        return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key !== "t") return;
-
-      e.preventDefault();
-
-      const {
-        isMultiRepo: imr,
-        currentRepo: cr,
-        reposLoaded: rl,
-      } = useRepoStore.getState();
-      if (!rl) return;
-
-      // In multi-repo mode, require a repo to be selected
-      if (imr && !cr) {
-        useRepoStore.setState({
-          error: "Select a repository first before searching files.",
-        });
-        return;
-      }
-
-      // Fetch file list if not already loaded, then open picker
-      const apiBase = getApiBase();
-      if (allFiles.length === 0) {
-        axios.get<string[]>(`${apiBase}/files`).then((res) => {
-          setAllFiles(res.data);
-          setFilePickerOpen(true);
-        });
-      } else {
-        setFilePickerOpen(true);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [allFiles, getApiBase]);
+    loadRepos();
+  }, [loadRepos]);
 
   // Clear cached file list when repo changes
   useEffect(() => {
     setAllFiles([]); // eslint-disable-line react-hooks/set-state-in-effect
   }, [currentRepo]);
-
-  // Load repos on mount
-  useEffect(() => {
-    loadRepos();
-  }, [loadRepos]);
 
   // Load initial tree structure (after repos are loaded, only for single-repo mode)
   useEffect(() => {
@@ -417,8 +381,13 @@ export const ViewerPage: React.FC = () => {
 
   // File picker select handler
   const handleFilePickerSelect = useCallback(
-    (path: string) => {
-      navigate(buildPath(path));
+    (path: string, repo?: string) => {
+      if (repo) {
+        // Global mode: navigate to the file in the specified repo
+        navigate(`/${repo}/${path}`);
+      } else {
+        navigate(buildPath(path));
+      }
     },
     [navigate, buildPath],
   );
@@ -427,6 +396,36 @@ export const ViewerPage: React.FC = () => {
   const handleOpenFilePicker = useCallback(() => {
     setFilePickerOpen(true);
   }, []);
+  const handleOpenGlobalFilePicker = useCallback(() => {
+    // Fetch global file list if not cached, then open
+    if (globalFiles.length === 0) {
+      axios.get<GlobalFile[]>("/api/files/all").then((res) => {
+        setGlobalFiles(res.data);
+        setGlobalFilePickerOpen(true);
+      });
+    } else {
+      setGlobalFilePickerOpen(true);
+    }
+  }, [globalFiles]);
+  const handleOpenProjectPicker = useCallback(() => {
+    setProjectPickerOpen(true);
+  }, []);
+  const handleOpenRecentFiles = useCallback(() => {
+    setRecentsModalOpen(true);
+  }, []);
+  const handleOpenGlobalRecentFiles = useCallback(() => {
+    // For global recents, fetch from /api/recent/all and open global file picker
+    axios.get<GlobalFile[]>("/api/recent/all?limit=200").then((res) => {
+      setGlobalFiles(res.data);
+      setGlobalFilePickerOpen(true);
+    });
+  }, []);
+  const handleProjectSelect = useCallback(
+    (repoName: string) => {
+      navigate(`/${repoName}`);
+    },
+    [navigate],
+  );
   const handleToggleSidebar = useCallback(() => {
     setSidebarOpen((prev) => !prev);
   }, []);
@@ -464,6 +463,10 @@ export const ViewerPage: React.FC = () => {
   }, [repoRootPath, currentPath]);
   const { shortcutsOpen, setShortcutsOpen } = useKeyboardShortcuts({
     onOpenFilePicker: handleOpenFilePicker,
+    onOpenGlobalFilePicker: handleOpenGlobalFilePicker,
+    onOpenProjectPicker: handleOpenProjectPicker,
+    onOpenRecentFiles: handleOpenRecentFiles,
+    onOpenGlobalRecentFiles: handleOpenGlobalRecentFiles,
     onToggleSidebar: handleToggleSidebar,
     onNavigate: handleShortcutNavigate,
     onViewDiff: handleViewDiff,
@@ -508,11 +511,16 @@ export const ViewerPage: React.FC = () => {
       } = useRepoStore.getState();
       if (!rl) return;
 
-      // In multi-repo mode, require a repo to be selected
+      // In multi-repo mode without repo selected, open global search
       if (imr && !cr) {
-        useRepoStore.setState({
-          error: "Select a repository first before searching files.",
-        });
+        if (globalFiles.length === 0) {
+          axios.get<GlobalFile[]>("/api/files/all").then((res) => {
+            setGlobalFiles(res.data);
+            setGlobalFilePickerOpen(true);
+          });
+        } else {
+          setGlobalFilePickerOpen(true);
+        }
         return;
       }
 
@@ -530,19 +538,7 @@ export const ViewerPage: React.FC = () => {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [allFiles, getApiBase, keyboardShortcutsEnabled]);
-
-  // Clear cached file list when repo changes
-  useEffect(() => {
-    setAllFiles([]); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [currentRepo]);
-
-  // Load repos on mount
-  useEffect(() => {
-    loadRepos();
-  }, [loadRepos]);
-
-  useWebSocket();
+  }, [allFiles, globalFiles, getApiBase, keyboardShortcutsEnabled]);
 
   // Close sidebar on mobile when navigating to a new path
   useEffect(() => {
@@ -605,6 +601,7 @@ export const ViewerPage: React.FC = () => {
               onShowEmptyDirsChange={setShowEmptyDirs}
               keyboardShortcutsEnabled={keyboardShortcutsEnabled}
               onKeyboardShortcutsEnabledChange={setKeyboardShortcutsEnabled}
+              onOpenWhatsNew={whatsNew.open}
             />
             <button
               className="md:hidden p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"
@@ -1093,12 +1090,29 @@ export const ViewerPage: React.FC = () => {
             </div>
           </div>
         ))}
-      {/* File Picker */}
+      {/* File Picker (local) */}
       <FilePicker
         isOpen={filePickerOpen}
         onClose={() => setFilePickerOpen(false)}
         onSelect={handleFilePickerSelect}
         files={allFiles}
+      />
+      {/* File Picker (global - all repos) */}
+      <FilePicker
+        isOpen={globalFilePickerOpen}
+        onClose={() => setGlobalFilePickerOpen(false)}
+        onSelect={handleFilePickerSelect}
+        files={[]}
+        globalFiles={globalFiles}
+        mode="global"
+        placeholder="Search all projects' files..."
+      />
+      {/* Project Picker */}
+      <ProjectPicker
+        isOpen={projectPickerOpen}
+        onClose={() => setProjectPickerOpen(false)}
+        onSelect={handleProjectSelect}
+        repos={repos}
       />
       {/* Recents Modal */}
       <RecentsModal
@@ -1109,6 +1123,11 @@ export const ViewerPage: React.FC = () => {
       <KeyboardShortcutsModal
         isOpen={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
+      />
+      {/* What's New Modal */}
+      <WhatsNewModal
+        isOpen={whatsNew.isOpen}
+        onClose={whatsNew.close}
       />
     </div>
   );

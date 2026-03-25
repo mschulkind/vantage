@@ -18,8 +18,12 @@ const shortcutGroups: ShortcutGroup[] = [
     title: "Navigation",
     shortcuts: [
       { keys: ["t"], description: "Open file finder" },
+      { keys: ["Shift", "T"], description: "Search all projects' files" },
+      { keys: ["r"], description: "Recent files (current project)" },
+      { keys: ["Shift", "R"], description: "Recent files (all projects)" },
+      { keys: ["Shift", "P"], description: "Switch project" },
       { keys: ["g", "h"], description: "Go home (root)" },
-      { keys: ["g", "r"], description: "Go to recent files" },
+      { keys: ["g", "r"], description: "Go to recent files page" },
       { keys: ["b"], description: "Toggle sidebar" },
       { keys: ["Esc"], description: "Close any open dialog" },
     ],

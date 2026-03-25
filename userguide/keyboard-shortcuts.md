@@ -7,7 +7,11 @@ Vantage supports keyboard shortcuts for fast navigation. Press `?` at any time t
 | Key       | Action                                                        |
 | --------- | ------------------------------------------------------------- |
 | `?`       | Show keyboard shortcuts help                                  |
-| `t`       | Open the fuzzy file picker                                    |
+| `t`       | Open the fuzzy file picker (current project)                  |
+| `Shift+T` | Search files across all projects                              |
+| `r`       | Search recent files (current project)                         |
+| `Shift+R` | Search recent files (all projects)                            |
+| `Shift+P` | Open the project picker to switch repos                       |
 | `b`       | Toggle the sidebar                                            |
 | `h`       | Open commit history for the current file                      |
 | `d`       | View the latest diff for the current file                     |
@@ -18,7 +22,7 @@ Vantage supports keyboard shortcuts for fast navigation. Press `?` at any time t
 | `g g`     | Scroll to the top of the page                                 |
 | `Shift+G` | Scroll to the bottom of the page                              |
 | `g h`     | Go to the home page (root directory)                          |
-| `g r`     | Go to recent files                                            |
+| `g r`     | Go to recent files page                                       |
 | `Escape`  | Close any open modal (file picker, diff viewer, diagram zoom) |
 
 Two-key sequences (like `g g`) have an 800ms timeout — press both keys in quick succession.

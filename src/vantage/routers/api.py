@@ -118,10 +118,26 @@ async def list_repos():
     loop = asyncio.get_event_loop()
 
     async def _get_last_activity(repo_cfg) -> RepoInfo:
-        """Get last commit timestamp for a repo (fast: 1 commit only)."""
+        """Get last file modification timestamp for a repo."""
         try:
 
-            def _last_commit_date():
+            def _newest_file_date():
+                try:
+                    git = GitService(repo_cfg.path, exclude_dirs=settings.exclude_dirs)
+                    recent = git.get_recently_changed_files(limit=1)
+                    if recent and recent[0].get("date"):
+                        from datetime import UTC, datetime
+
+                        date_str = recent[0]["date"]
+                        if isinstance(date_str, str):
+                            dt = datetime.fromisoformat(date_str)
+                            if dt.tzinfo is None:
+                                dt = dt.replace(tzinfo=UTC)
+                            return dt
+                        return date_str
+                except Exception:
+                    pass
+                # Fallback to git log
                 import subprocess
                 from datetime import UTC, datetime
 
@@ -139,13 +155,69 @@ async def list_repos():
                     pass
                 return None
 
-            last = await loop.run_in_executor(None, _last_commit_date)
+            last = await loop.run_in_executor(None, _newest_file_date)
             return RepoInfo(name=repo_cfg.name, last_activity=last)
         except Exception:
             return RepoInfo(name=repo_cfg.name)
 
     results = await asyncio.gather(*[_get_last_activity(r) for r in daemon_config.repos])
     return list(results)
+
+
+@router.get("/files/all")
+async def list_all_files_global():
+    """List all files across all repositories."""
+    daemon_config = get_daemon_config()
+    if not daemon_config:
+        # Single-repo mode: return files with empty repo name
+        fs = get_fs_service()
+        return [{"repo": "", "path": p} for p in fs.list_all_files()]
+
+    loop = asyncio.get_running_loop()
+
+    async def _get_files(repo_cfg):
+        fs = FileSystemService(
+            repo_cfg.path,
+            exclude_dirs=settings.exclude_dirs,
+            show_hidden=settings.show_hidden,
+        )
+        files = await loop.run_in_executor(None, fs.list_all_files)
+        return [{"repo": repo_cfg.name, "path": p} for p in files]
+
+    results = await asyncio.gather(*[_get_files(r) for r in daemon_config.repos])
+    # Flatten list of lists
+    return [item for sublist in results for item in sublist]
+
+
+@router.get("/recent/all")
+async def get_recent_files_global(limit: int = 10):
+    """Get recently changed files across all repositories."""
+    daemon_config = get_daemon_config()
+    limit = min(max(limit, 1), 1000)
+
+    if not daemon_config:
+        # Single-repo mode
+        git = get_git_service()
+        loop = asyncio.get_running_loop()
+        files = await loop.run_in_executor(
+            None, partial(git.get_recently_changed_files, limit=limit)
+        )
+        return [{"repo": "", **f} for f in files]
+
+    loop = asyncio.get_running_loop()
+
+    async def _get_recent(repo_cfg):
+        git = GitService(repo_cfg.path, exclude_dirs=settings.exclude_dirs)
+        files = await loop.run_in_executor(
+            None, partial(git.get_recently_changed_files, limit=limit)
+        )
+        return [{"repo": repo_cfg.name, **f} for f in files]
+
+    results = await asyncio.gather(*[_get_recent(r) for r in daemon_config.repos])
+    # Flatten and sort by date descending, take top `limit`
+    all_files = [item for sublist in results for item in sublist]
+    all_files.sort(key=lambda x: x.get("date", ""), reverse=True)
+    return all_files[:limit]
 
 
 # Multi-repo endpoints (when running in daemon mode)

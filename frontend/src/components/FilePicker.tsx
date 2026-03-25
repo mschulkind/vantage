@@ -9,67 +9,132 @@ import { createPortal } from "react-dom";
 import { File, Search } from "lucide-react";
 import { cn } from "../lib/utils";
 
+export interface GlobalFile {
+  repo: string;
+  path: string;
+}
+
 interface FilePickerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (path: string) => void;
+  onSelect: (path: string, repo?: string) => void;
   files: string[];
+  /** Global mode: search across all repos */
+  globalFiles?: GlobalFile[];
+  mode?: "local" | "global";
+  placeholder?: string;
 }
 
-/** Subsequence (fuzzy) match: checks if all chars of query appear in str in order. */
+const WORD_SEPARATORS = new Set(["/", ".", "-", "_", " "]);
+
+/**
+ * Fuzzy match optimized for file paths.
+ * Strategy: try basename first (huge bonus), then full path.
+ * Heavily penalizes gaps between matched characters.
+ */
 function fuzzyMatch(
   query: string,
   str: string,
 ): { match: boolean; score: number; indices: number[] } {
   const q = query.toLowerCase();
   const s = str.toLowerCase();
-  const indices: number[] = [];
-  let qi = 0;
 
-  for (let si = 0; si < s.length && qi < q.length; si++) {
-    if (s[si] === q[qi]) {
-      indices.push(si);
-      qi++;
-    }
+  if (q.length === 0) return { match: true, score: 0, indices: [] };
+  if (q.length > s.length) return { match: false, score: 0, indices: [] };
+
+  // Exact substring match — best possible result
+  const substringIdx = s.indexOf(q);
+  if (substringIdx !== -1) {
+    const indices = Array.from({ length: q.length }, (_, i) => substringIdx + i);
+    let score = 1000; // huge bonus for exact substring
+    // Extra bonus if it matches in basename
+    const lastSlash = s.lastIndexOf("/");
+    if (substringIdx > lastSlash) score += 500;
+    // Bonus for matching at a word boundary
+    if (
+      substringIdx === 0 ||
+      WORD_SEPARATORS.has(s[substringIdx - 1])
+    )
+      score += 200;
+    // Prefer shorter paths
+    score -= s.length * 0.5;
+    return { match: true, score, indices };
   }
 
-  if (qi !== q.length) {
-    return { match: false, score: 0, indices: [] };
-  }
+  // Subsequence match with smart index selection
+  const indices = subsequenceMatch(q, s);
+  if (!indices) return { match: false, score: 0, indices: [] };
 
-  // Score: prefer shorter strings, consecutive matches, and matches at word boundaries
+  // Score the match
   let score = 0;
+  const lastSlash = s.lastIndexOf("/");
+  const basenameStart = lastSlash + 1;
 
-  // Bonus for consecutive chars
-  for (let i = 1; i < indices.length; i++) {
-    if (indices[i] === indices[i - 1] + 1) {
+  for (let i = 0; i < indices.length; i++) {
+    const idx = indices[i];
+
+    // Consecutive character bonus
+    if (i > 0 && idx === indices[i - 1] + 1) {
+      score += 15;
+    } else if (i > 0) {
+      // Gap penalty — larger gaps are worse
+      const gap = idx - indices[i - 1];
+      score -= gap * 2;
+    }
+
+    // Word boundary bonus
+    if (idx === 0 || WORD_SEPARATORS.has(s[idx - 1])) {
+      score += 20;
+    }
+
+    // Basename match bonus
+    if (idx >= basenameStart) {
+      score += 10;
+    }
+
+    // CamelCase boundary bonus
+    if (idx > 0 && s[idx] >= "a" && str[idx] >= "A" && str[idx] <= "Z") {
       score += 10;
     }
   }
 
-  // Bonus for matching at start of path segments
-  for (const idx of indices) {
-    if (idx === 0 || s[idx - 1] === "/") {
-      score += 5;
+  // Prefer shorter paths
+  score -= s.length * 0.5;
+
+  return { match: true, score, indices };
+}
+
+/**
+ * Find the best subsequence match indices.
+ * Uses a two-pass approach: forward scan to verify match exists,
+ * then backward scan from the end to prefer tighter groupings.
+ */
+function subsequenceMatch(query: string, str: string): number[] | null {
+  // Forward pass: verify match exists and find rightmost possible positions
+  let qi = 0;
+  for (let si = 0; si < str.length && qi < query.length; si++) {
+    if (str[si] === query[qi]) qi++;
+  }
+  if (qi !== query.length) return null;
+
+  // Backward pass: prefer matches closer together and near the end (basename)
+  const indices: number[] = new Array(query.length);
+  qi = query.length - 1;
+  for (let si = str.length - 1; si >= 0 && qi >= 0; si--) {
+    if (str[si] === query[qi]) {
+      indices[qi] = si;
+      qi--;
     }
   }
 
-  // Penalise longer strings
-  score -= str.length * 0.1;
-
-  // Bonus for basename matches (filename, not directory)
-  const lastSlash = s.lastIndexOf("/");
-  const basenameStart = lastSlash + 1;
-  const basenameIndices = indices.filter((i) => i >= basenameStart);
-  score += basenameIndices.length * 3;
-
-  return { match: true, score, indices };
+  return indices;
 }
 
 interface MatchedFile {
   path: string;
   score: number;
   indices: number[];
+  repo?: string;
 }
 
 function HighlightedPath({
@@ -108,30 +173,82 @@ export const FilePicker: React.FC<FilePickerProps> = ({
   onClose,
   onSelect,
   files,
+  globalFiles,
+  mode = "local",
+  placeholder,
 }) => {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const isGlobal = mode === "global" && globalFiles;
+
+  // Debounce the search query (100ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 100);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   // Filter + rank
   const results: MatchedFile[] = useMemo(() => {
-    if (!query.trim()) {
-      // No query: show all files sorted alphabetically, up to a reasonable limit
+    if (isGlobal) {
+      // Global mode: search across all repos
+      if (!debouncedQuery.trim()) {
+        return (globalFiles || [])
+          .slice(0, 100)
+          .map((f) => ({ path: f.path, repo: f.repo, score: 0, indices: [] }));
+      }
+      const matched: MatchedFile[] = [];
+      for (const f of globalFiles || []) {
+        // Match against path first (most relevant)
+        const { match: pathMatch, score: pathScore, indices: pathIndices } =
+          fuzzyMatch(debouncedQuery, f.path);
+        if (pathMatch) {
+          matched.push({
+            path: f.path,
+            repo: f.repo,
+            score: pathScore,
+            indices: pathIndices,
+          });
+          continue;
+        }
+        // Fall back to matching against "repo/path" for repo-name searches
+        const display = `${f.repo}/${f.path}`;
+        const { match, score, indices } = fuzzyMatch(debouncedQuery, display);
+        if (match) {
+          const repoOffset = f.repo.length + 1;
+          matched.push({
+            path: f.path,
+            repo: f.repo,
+            score: score - 100,
+            // Convert indices to be relative to path only
+            indices: indices
+              .filter((i) => i >= repoOffset)
+              .map((i) => i - repoOffset),
+          });
+        }
+      }
+      matched.sort((a, b) => b.score - a.score);
+      return matched.slice(0, 100);
+    }
+
+    // Local mode: existing behavior
+    if (!debouncedQuery.trim()) {
       return files
         .slice(0, 100)
         .map((f) => ({ path: f, score: 0, indices: [] }));
     }
     const matched: MatchedFile[] = [];
     for (const path of files) {
-      const { match, score, indices } = fuzzyMatch(query, path);
+      const { match, score, indices } = fuzzyMatch(debouncedQuery, path);
       if (match) {
         matched.push({ path, score, indices });
       }
     }
     matched.sort((a, b) => b.score - a.score);
     return matched.slice(0, 100);
-  }, [query, files]);
+  }, [debouncedQuery, files, isGlobal, globalFiles]);
 
   // Track mounting state for cleanup
   const isMountedRef = useRef(true);
@@ -147,6 +264,7 @@ export const FilePicker: React.FC<FilePickerProps> = ({
   useEffect(() => {
     if (isOpen) {
       setQuery(""); // eslint-disable-line react-hooks/set-state-in-effect
+      setDebouncedQuery("");
       setSelectedIndex(0);
       // Small delay to ensure DOM is ready
       requestAnimationFrame(() => {
@@ -176,7 +294,7 @@ export const FilePicker: React.FC<FilePickerProps> = ({
         case "Enter":
           e.preventDefault();
           if (results[selectedIndex]) {
-            onSelect(results[selectedIndex].path);
+            onSelect(results[selectedIndex].path, results[selectedIndex].repo);
             onClose();
           }
           break;
@@ -208,7 +326,7 @@ export const FilePicker: React.FC<FilePickerProps> = ({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search files by name..."
+            placeholder={placeholder || "Search files by name..."}
             className="w-full px-3 py-3 text-sm outline-none bg-transparent placeholder:text-slate-400 text-slate-900 dark:text-slate-100"
             autoComplete="off"
             spellCheck={false}
@@ -227,7 +345,7 @@ export const FilePicker: React.FC<FilePickerProps> = ({
           ) : (
             results.map((result, i) => (
               <div
-                key={result.path}
+                key={result.repo ? `${result.repo}/${result.path}` : result.path}
                 data-file-item
                 className={cn(
                   "flex items-center px-4 py-2 text-sm cursor-pointer transition-colors",
@@ -236,7 +354,7 @@ export const FilePicker: React.FC<FilePickerProps> = ({
                     : "hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300",
                 )}
                 onClick={() => {
-                  onSelect(result.path);
+                  onSelect(result.path, result.repo);
                   onClose();
                 }}
                 onMouseEnter={() => setSelectedIndex(i)}
@@ -248,7 +366,15 @@ export const FilePicker: React.FC<FilePickerProps> = ({
                     i === selectedIndex ? "text-blue-500" : "text-slate-400",
                   )}
                 />
-                <HighlightedPath path={result.path} indices={result.indices} />
+                {isGlobal && result.repo && (
+                  <span className="text-xs font-medium text-slate-400 dark:text-slate-500 mr-1.5 shrink-0">
+                    {result.repo}/
+                  </span>
+                )}
+                <HighlightedPath
+                  path={result.path}
+                  indices={result.indices}
+                />
               </div>
             ))
           )}

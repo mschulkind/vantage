@@ -3,7 +3,7 @@ package = true
 
 [project]
 name = "vantage"
-version = "0.0.1"
+version = "0.2.0"
 description = "A beautiful local Markdown viewer with live reload and Git awareness"
 readme = "README.md"
 requires-python = ">=3.13"

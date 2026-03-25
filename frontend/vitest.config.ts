@@ -1,8 +1,9 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { changelogPlugin } from "./vite-changelog-plugin";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), changelogPlugin()],
   test: {
     globals: true,
     environment: "jsdom",
