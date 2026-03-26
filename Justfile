@@ -147,7 +147,12 @@ build: bundle-frontend
     echo "Building version: $build_version"
 
     # Temporarily patch pyproject.toml version for the build
-    sed -i "s/^version = \".*\"/version = \"${build_version}\"/" pyproject.toml
+    # Use python instead of sed -i for macOS/Linux portability
+    python3 -c "
+    import re, pathlib
+    p = pathlib.Path('pyproject.toml')
+    p.write_text(re.sub(r'^version = \".*\"', 'version = \"${build_version}\"', p.read_text(), count=1, flags=re.MULTILINE))
+    "
     trap 'git checkout pyproject.toml 2>/dev/null || true' EXIT
     uv build
 
