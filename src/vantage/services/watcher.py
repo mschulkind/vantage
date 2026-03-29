@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from pathlib import Path
 
 from watchfiles import Change, DefaultFilter, awatch
@@ -102,6 +103,9 @@ async def _coalesce_and_broadcast(
 
 async def watch_repo():
     """Watch single repo (legacy mode) with quiet-period coalescing."""
+    # Yield to event loop so uvicorn can signal startup complete
+    # before the potentially slow awatch() inotify initialization.
+    await asyncio.sleep(0)
     logger.info(f"Starting watcher for {settings.target_repo}")
     target = settings.target_repo.resolve()
 
@@ -116,7 +120,12 @@ async def watch_repo():
         batch_start = None
         await _coalesce_and_broadcast(paths)
 
+    logger.info("Initializing file watcher...")
+    t0 = time.monotonic()
     async for changes in awatch(target, watch_filter=_GitAwareFilter()):
+        if t0 is not None:
+            logger.info("[startup] file watcher ready (%.0fms)", (time.monotonic() - t0) * 1000)
+            t0 = None
         for _change, abs_path in changes:
             try:
                 rel_path = str(Path(abs_path).relative_to(target))
@@ -150,6 +159,9 @@ async def watch_repo():
 
 async def watch_multi_repo():
     """Watch multiple repos (daemon mode) with quiet-period coalescing."""
+    # Yield to event loop so uvicorn can signal startup complete
+    # before the potentially slow awatch() inotify initialization.
+    await asyncio.sleep(0)
     daemon_config = get_daemon_config()
     if not daemon_config:
         await watch_repo()
@@ -175,7 +187,12 @@ async def watch_multi_repo():
         for repo_name, paths in snapshot.items():
             await _coalesce_and_broadcast(paths, repo_name)
 
+    logger.info("Initializing file watchers for %d repos...", len(watch_paths))
+    t0 = time.monotonic()
     async for changes in awatch(*watch_paths, watch_filter=_GitAwareFilter()):
+        if t0 is not None:
+            logger.info("[startup] file watchers ready (%.0fms)", (time.monotonic() - t0) * 1000)
+            t0 = None
         for _change, abs_path in changes:
             abs_path_obj = Path(abs_path)
             for repo_path_str, name in path_to_repo.items():
