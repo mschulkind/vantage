@@ -15,6 +15,7 @@ export async function getMermaid(): Promise<typeof mermaidAPI> {
         startOnLoad: false,
         theme: isDark() ? "dark" : "default",
         securityLevel: "strict",
+        suppressErrorRendering: true,
       });
       mermaidInstance = m;
       return m;

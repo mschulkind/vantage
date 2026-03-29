@@ -44,15 +44,18 @@ describe("MermaidDiagram", () => {
 
   it("renders error message when processing fails", async () => {
     (mermaid.render as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("Mermaid error"),
+      new Error("Parse error on line 2: unexpected token"),
     );
 
     render(<MermaidDiagram code={code} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Failed to render diagram/i)).toBeInTheDocument();
+      expect(screen.getByText(/Diagram syntax error/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(code)).toBeInTheDocument();
+    // Error message is displayed
+    expect(screen.getByText(/Parse error on line 2/i)).toBeInTheDocument();
+    // Source is hidden by default behind toggle
+    expect(screen.getByText(/Show source/i)).toBeInTheDocument();
   });
 
   it("opens modal when maximize button is clicked", async () => {

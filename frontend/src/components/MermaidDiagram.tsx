@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, memo } from "react";
-import { Maximize2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, Maximize2 } from "lucide-react";
 import { Modal } from "./Modal";
 import { svgCache } from "../lib/mermaidCache";
 import { getMermaid } from "../lib/mermaidLoader";
@@ -8,10 +8,28 @@ interface MermaidDiagramProps {
   code: string;
 }
 
+function extractErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    // Mermaid wraps parse errors in a message like "Parse error on line N: ..."
+    // Strip the "Error: " prefix and any d3/dom noise
+    const msg = err.message;
+    // Try to find the most useful part of the error
+    const parseMatch = msg.match(
+      /(?:Parse error|Syntax error|Error).*?(?:line \d+.*)/i,
+    );
+    if (parseMatch) return parseMatch[0];
+    // Fallback: first line only (mermaid errors can be very verbose)
+    return msg.split("\n")[0].slice(0, 200);
+  }
+  if (typeof err === "string") return err.split("\n")[0].slice(0, 200);
+  return "Unknown error";
+}
+
 const MermaidDiagramInner: React.FC<MermaidDiagramProps> = ({ code }) => {
   const hasCached = svgCache.has(code);
   const [svg, setSvg] = useState<string>(() => svgCache.get(code) || "");
-  const [error, setError] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showSource, setShowSource] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(!hasCached);
   const [minHeight, setMinHeight] = useState<string>("auto");
@@ -55,13 +73,13 @@ const MermaidDiagramInner: React.FC<MermaidDiagramProps> = ({ code }) => {
           // Cache the rendered SVG
           svgCache.set(code, renderedSvg);
           setSvg(renderedSvg);
-          setError(false);
+          setErrorMessage(null);
           setIsLoading(false);
         }
       } catch (err) {
         console.error("Mermaid render error:", err);
         if (mounted) {
-          setError(true);
+          setErrorMessage(extractErrorMessage(err));
           setIsLoading(false);
         }
       }
@@ -74,14 +92,37 @@ const MermaidDiagramInner: React.FC<MermaidDiagramProps> = ({ code }) => {
     };
   }, [code, stableId, hasCached]);
 
-  if (error) {
+  if (errorMessage) {
     return (
       <div
         data-testid="mermaid-container"
-        className="p-4 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm font-mono overflow-auto"
+        className="my-4 rounded-md border border-yellow-300/40 bg-yellow-50/50 dark:border-yellow-700/40 dark:bg-yellow-950/20 overflow-hidden"
       >
-        Failed to render diagram
-        <pre className="mt-2 text-xs opacity-75">{code}</pre>
+        <div className="flex items-center gap-2 px-4 py-2.5 text-sm text-yellow-800 dark:text-yellow-200">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span className="font-medium">Diagram syntax error</span>
+          <span className="text-yellow-700/70 dark:text-yellow-300/60">
+            — {errorMessage}
+          </span>
+        </div>
+        <div className="border-t border-yellow-300/30 dark:border-yellow-700/30">
+          <button
+            onClick={() => setShowSource(!showSource)}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs text-yellow-700/60 dark:text-yellow-400/50 hover:text-yellow-800 dark:hover:text-yellow-300 transition-colors w-full"
+          >
+            {showSource ? (
+              <ChevronUp className="w-3 h-3" />
+            ) : (
+              <ChevronDown className="w-3 h-3" />
+            )}
+            {showSource ? "Hide source" : "Show source"}
+          </button>
+          {showSource && (
+            <pre className="px-4 pb-3 text-xs font-mono text-yellow-800/70 dark:text-yellow-200/60 overflow-auto whitespace-pre-wrap">
+              {code}
+            </pre>
+          )}
+        </div>
       </div>
     );
   }
