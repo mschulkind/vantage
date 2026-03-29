@@ -1,9 +1,10 @@
 import asyncio
 import logging
+import threading
 import time
 from pathlib import Path
 
-from watchfiles import Change, DefaultFilter, awatch
+from watchfiles import Change, DefaultFilter, watch
 
 from vantage.services.socket_manager import manager
 from vantage.settings import get_daemon_config, settings
@@ -102,12 +103,29 @@ async def _coalesce_and_broadcast(
 
 
 async def watch_repo():
-    """Watch single repo (legacy mode) with quiet-period coalescing."""
-    # Yield to event loop so uvicorn can signal startup complete
-    # before the potentially slow awatch() inotify initialization.
-    await asyncio.sleep(0)
+    """Watch single repo (legacy mode) with quiet-period coalescing.
+
+    Uses the synchronous ``watch()`` in a daemon thread so that the
+    (potentially slow) inotify initialization never blocks the event loop.
+    """
     logger.info(f"Starting watcher for {settings.target_repo}")
     target = settings.target_repo.resolve()
+
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[set[tuple[Change, str]]] = asyncio.Queue()
+
+    def _run_sync_watcher() -> None:
+        logger.info("Initializing file watcher...")
+        t0 = time.monotonic()
+        first = True
+        for changes in watch(target, watch_filter=_GitAwareFilter()):
+            if first:
+                logger.info("[startup] file watcher ready (%.0fms)", (time.monotonic() - t0) * 1000)
+                first = False
+            loop.call_soon_threadsafe(queue.put_nowait, changes)
+
+    thread = threading.Thread(target=_run_sync_watcher, daemon=True)
+    thread.start()
 
     pending: set[str] = set()
     quiet_task: asyncio.Task[None] | None = None
@@ -120,12 +138,8 @@ async def watch_repo():
         batch_start = None
         await _coalesce_and_broadcast(paths)
 
-    logger.info("Initializing file watcher...")
-    t0 = time.monotonic()
-    async for changes in awatch(target, watch_filter=_GitAwareFilter()):
-        if t0 is not None:
-            logger.info("[startup] file watcher ready (%.0fms)", (time.monotonic() - t0) * 1000)
-            t0 = None
+    while True:
+        changes = await queue.get()
         for _change, abs_path in changes:
             try:
                 rel_path = str(Path(abs_path).relative_to(target))
@@ -141,15 +155,13 @@ async def watch_repo():
         if batch_start is None:
             batch_start = now
 
-        # Cancel previous quiet-period timer
         if quiet_task and not quiet_task.done():
             quiet_task.cancel()
 
-        # If we've been accumulating too long, flush now
         if now - batch_start >= _MAX_WAIT_S:
             await flush()
         else:
-            # Wait for quiet period before flushing
+
             async def _delayed_flush() -> None:
                 await asyncio.sleep(_QUIET_PERIOD_S)
                 await flush()
@@ -158,10 +170,11 @@ async def watch_repo():
 
 
 async def watch_multi_repo():
-    """Watch multiple repos (daemon mode) with quiet-period coalescing."""
-    # Yield to event loop so uvicorn can signal startup complete
-    # before the potentially slow awatch() inotify initialization.
-    await asyncio.sleep(0)
+    """Watch multiple repos (daemon mode) with quiet-period coalescing.
+
+    Uses the synchronous ``watch()`` in a daemon thread so that the
+    (potentially slow) inotify initialization never blocks the event loop.
+    """
     daemon_config = get_daemon_config()
     if not daemon_config:
         await watch_repo()
@@ -175,6 +188,24 @@ async def watch_multi_repo():
         path_to_repo[str(resolved)] = repo.name
         logger.info(f"Starting watcher for repo '{repo.name}' at {resolved}")
 
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[set[tuple[Change, str]]] = asyncio.Queue()
+
+    def _run_sync_watcher() -> None:
+        logger.info("Initializing file watchers for %d repos...", len(watch_paths))
+        t0 = time.monotonic()
+        first = True
+        for changes in watch(*watch_paths, watch_filter=_GitAwareFilter()):
+            if first:
+                logger.info(
+                    "[startup] file watchers ready (%.0fms)", (time.monotonic() - t0) * 1000
+                )
+                first = False
+            loop.call_soon_threadsafe(queue.put_nowait, changes)
+
+    thread = threading.Thread(target=_run_sync_watcher, daemon=True)
+    thread.start()
+
     pending: dict[str, set[str]] = {}  # repo_name -> paths
     quiet_task: asyncio.Task[None] | None = None
     batch_start: float | None = None
@@ -187,12 +218,8 @@ async def watch_multi_repo():
         for repo_name, paths in snapshot.items():
             await _coalesce_and_broadcast(paths, repo_name)
 
-    logger.info("Initializing file watchers for %d repos...", len(watch_paths))
-    t0 = time.monotonic()
-    async for changes in awatch(*watch_paths, watch_filter=_GitAwareFilter()):
-        if t0 is not None:
-            logger.info("[startup] file watchers ready (%.0fms)", (time.monotonic() - t0) * 1000)
-            t0 = None
+    while True:
+        changes = await queue.get()
         for _change, abs_path in changes:
             abs_path_obj = Path(abs_path)
             for repo_path_str, name in path_to_repo.items():
