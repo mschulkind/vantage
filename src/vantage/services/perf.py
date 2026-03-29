@@ -25,10 +25,14 @@ logger = logging.getLogger(__name__)
 def _get_git_sha() -> str:
     """Return the short git SHA of the running code (with dirty flag), or 'unknown'.
 
-    Tries the package source dir first, then common workspace locations.
-    When installed as a uv tool, __file__ lives outside any git repo,
-    so we also try the current working directory.
+    Strategy:
+    1. Try ``git rev-parse`` from the source dir or cwd (works in dev).
+    2. Fall back to extracting the SHA from the package version string
+       (e.g. ``0.2.0.dev0+g5e4b3daa`` → ``5e4b3daa``).  This works
+       when installed as a uv tool where the code lives outside any repo.
     """
+    import re
+
     for cwd in [
         os.path.dirname(os.path.abspath(__file__)),
         os.getcwd(),
@@ -43,7 +47,6 @@ def _get_git_sha() -> str:
             )
             if proc.returncode == 0 and proc.stdout.strip():
                 sha = proc.stdout.strip()
-                # Check for uncommitted changes
                 dirty_proc = subprocess.run(
                     ["git", "diff", "--quiet", "HEAD"],
                     capture_output=True,
@@ -55,6 +58,17 @@ def _get_git_sha() -> str:
                 return sha
         except Exception:
             continue
+
+    # Fallback: extract from package version (e.g. "0.2.0.dev0+g5e4b3daa")
+    try:
+        from importlib.metadata import version
+
+        ver = version("vantage")
+        m = re.search(r"\+g([0-9a-f]+)", ver)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
     return "unknown"
 
 

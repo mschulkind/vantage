@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from importlib.metadata import version as pkg_version
@@ -9,6 +10,21 @@ import uvicorn
 from vantage.config import DEFAULT_CONFIG_PATH, DaemonConfig, create_example_config
 
 _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def _configure_app_logging() -> None:
+    """Ensure vantage.* loggers emit at INFO level.
+
+    Uvicorn only configures its own loggers; without this, our
+    application-level INFO messages (startup phases, per-repo timing)
+    are silently dropped because the root logger defaults to WARNING.
+    """
+    vantage_logger = logging.getLogger("vantage")
+    if not vantage_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        vantage_logger.addHandler(handler)
+    vantage_logger.setLevel(logging.INFO)
 
 
 def _get_version() -> str:
@@ -70,6 +86,7 @@ def serve(repo_path: str | None, host: str | None, port: int | None, show_hidden
     final_settings = settings.get_settings()
 
     _warn_nonlocal(final_settings.host)
+    _configure_app_logging()
     uvicorn.run("vantage.main:app", host=final_settings.host, port=final_settings.port, reload=True)
 
 
@@ -151,6 +168,8 @@ def daemon(config: str | None, host: list[str] | None, port: int | None):
         click.echo(f"  - {repo.name}: {repo.path}")
 
     hosts = [daemon_cfg.host] if isinstance(daemon_cfg.host, str) else daemon_cfg.host
+
+    _configure_app_logging()
 
     if len(hosts) == 1:
         uvicorn.run(
@@ -382,7 +401,11 @@ def _print_perf_report(data: dict):
     ver = meta.get("app_version", "?")
     sha = meta.get("git_sha", "?")
     uptime = meta.get("uptime_s", 0)
-    click.secho(f"═══ Vantage Performance Report ═══  v{ver} ({sha})  up {uptime:.0f}s", fg="cyan", bold=True)
+    click.secho(
+        f"═══ Vantage Performance Report ═══  v{ver} ({sha})  up {uptime:.0f}s",
+        fg="cyan",
+        bold=True,
+    )
     click.echo()
 
     # Request summary
