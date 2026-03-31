@@ -113,7 +113,7 @@ class DaemonConfig:
 
         return config
 
-    def _discover_repos_from_source_dirs(self) -> None:
+    def _discover_repos_from_source_dirs(self) -> list["RepoConfig"]:
         """Scan source_dirs for git repos and add any not already configured.
 
         A subdirectory is considered a repo if it contains a ``.git``
@@ -121,9 +121,12 @@ class DaemonConfig:
         already matches an explicit ``[[repos]]`` entry are skipped.
         Names are derived from the directory name with a numeric suffix
         added if the name is already taken.
+
+        Returns the list of newly discovered repos (empty if none).
         """
         existing_paths = {repo.path.resolve() for repo in self.repos}
         existing_names = {repo.name for repo in self.repos}
+        new_repos: list[RepoConfig] = []
 
         for source_dir in self.source_dirs:
             if not source_dir.is_dir():
@@ -158,10 +161,14 @@ class DaemonConfig:
                     name = f"{base_name}-{counter}"
                     counter += 1
 
-                self.repos.append(RepoConfig(name=name, path=resolved))
+                repo = RepoConfig(name=name, path=resolved)
+                self.repos.append(repo)
                 existing_paths.add(resolved)
                 existing_names.add(name)
+                new_repos.append(repo)
                 logger.info("Auto-discovered repo: %s → %s", name, resolved)
+
+        return new_repos
 
     def validate(self) -> list[str]:
         """Validate the configuration and return a list of errors."""

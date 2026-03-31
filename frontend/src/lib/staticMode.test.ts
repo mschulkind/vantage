@@ -68,13 +68,9 @@ describe("staticMode", () => {
       if (!interceptorFn) throw new Error("Interceptor not installed");
 
       // Test simple endpoints
-      expect(interceptorFn({ url: "/api/repos" }).url).toBe(
-        "./api/repos.json",
-      );
+      expect(interceptorFn({ url: "/api/repos" }).url).toBe("./api/repos.json");
       expect(interceptorFn({ url: "/api/info" }).url).toBe("./api/info.json");
-      expect(interceptorFn({ url: "/api/files" }).url).toBe(
-        "./api/files.json",
-      );
+      expect(interceptorFn({ url: "/api/files" }).url).toBe("./api/files.json");
       expect(interceptorFn({ url: "/api/health" }).url).toBe(
         "./api/health.json",
       );

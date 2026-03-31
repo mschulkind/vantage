@@ -8,7 +8,8 @@ const trackedFile: RecentFile = {
   path: "docs/design/technical_spec.md",
   date: "2025-01-15T15:30:00Z",
   author_name: "Matt Schulkind",
-  message: "Fix TypeScript error: use onBeforeNavigate instead of onClick for better navigation handling",
+  message:
+    "Fix TypeScript error: use onBeforeNavigate instead of onClick for better navigation handling",
   hexsha: "abc123def456789",
   untracked: false,
 };

@@ -171,8 +171,13 @@ export const useGitStore = create<GitState>((set) => ({
     const apiBase = getApiBase();
     if (!apiBase) return;
     try {
-      const response = await axios.get<{ name: string; root_path: string }>(`${apiBase}/info`);
-      set({ repoName: response.data.name, repoRootPath: response.data.root_path });
+      const response = await axios.get<{ name: string; root_path: string }>(
+        `${apiBase}/info`,
+      );
+      set({
+        repoName: response.data.name,
+        repoRootPath: response.data.root_path,
+      });
     } catch {
       set({ repoName: null, repoRootPath: null });
     }

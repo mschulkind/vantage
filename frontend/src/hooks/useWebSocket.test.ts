@@ -112,9 +112,7 @@ describe("useWebSocket", () => {
 
   it("does not reload file when changed file is not the current one", () => {
     const repoState = makeRepoStoreState({ currentPath: "other.md" });
-    const mockStore = (
-      selector?: (state: typeof repoState) => unknown,
-    ) => {
+    const mockStore = (selector?: (state: typeof repoState) => unknown) => {
       if (typeof selector === "function") return selector(repoState);
       return repoState;
     };
@@ -236,7 +234,8 @@ describe("useWebSocket", () => {
   describe("reconnect on visibility change", () => {
     it("force-reconnects after being hidden for more than 30s", () => {
       renderHook(() => useWebSocket());
-      const initialCalls = (global.WebSocket as ReturnType<typeof vi.fn>).mock.calls.length;
+      const initialCalls = (global.WebSocket as ReturnType<typeof vi.fn>).mock
+        .calls.length;
 
       // Simulate tab hidden
       act(() => {
@@ -271,7 +270,8 @@ describe("useWebSocket", () => {
 
       // Mark socket as open/healthy
       mockWebSocket.readyState = WebSocket.OPEN;
-      const initialCalls = (global.WebSocket as ReturnType<typeof vi.fn>).mock.calls.length;
+      const initialCalls = (global.WebSocket as ReturnType<typeof vi.fn>).mock
+        .calls.length;
 
       act(() => {
         Object.defineProperty(document, "visibilityState", {

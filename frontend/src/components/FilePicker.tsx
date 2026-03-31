@@ -45,16 +45,16 @@ function fuzzyMatch(
   // Exact substring match — best possible result
   const substringIdx = s.indexOf(q);
   if (substringIdx !== -1) {
-    const indices = Array.from({ length: q.length }, (_, i) => substringIdx + i);
+    const indices = Array.from(
+      { length: q.length },
+      (_, i) => substringIdx + i,
+    );
     let score = 1000; // huge bonus for exact substring
     // Extra bonus if it matches in basename
     const lastSlash = s.lastIndexOf("/");
     if (substringIdx > lastSlash) score += 500;
     // Bonus for matching at a word boundary
-    if (
-      substringIdx === 0 ||
-      WORD_SEPARATORS.has(s[substringIdx - 1])
-    )
+    if (substringIdx === 0 || WORD_SEPARATORS.has(s[substringIdx - 1]))
       score += 200;
     // Prefer shorter paths
     score -= s.length * 0.5;
@@ -202,8 +202,11 @@ export const FilePicker: React.FC<FilePickerProps> = ({
       const matched: MatchedFile[] = [];
       for (const f of globalFiles || []) {
         // Match against path first (most relevant)
-        const { match: pathMatch, score: pathScore, indices: pathIndices } =
-          fuzzyMatch(debouncedQuery, f.path);
+        const {
+          match: pathMatch,
+          score: pathScore,
+          indices: pathIndices,
+        } = fuzzyMatch(debouncedQuery, f.path);
         if (pathMatch) {
           matched.push({
             path: f.path,
@@ -345,7 +348,9 @@ export const FilePicker: React.FC<FilePickerProps> = ({
           ) : (
             results.map((result, i) => (
               <div
-                key={result.repo ? `${result.repo}/${result.path}` : result.path}
+                key={
+                  result.repo ? `${result.repo}/${result.path}` : result.path
+                }
                 data-file-item
                 className={cn(
                   "flex items-center px-4 py-2 text-sm cursor-pointer transition-colors",
@@ -371,10 +376,7 @@ export const FilePicker: React.FC<FilePickerProps> = ({
                     {result.repo}/
                   </span>
                 )}
-                <HighlightedPath
-                  path={result.path}
-                  indices={result.indices}
-                />
+                <HighlightedPath path={result.path} indices={result.indices} />
               </div>
             ))
           )}

@@ -164,7 +164,9 @@ describe("useRepoStore", () => {
     });
 
     it("sets empty children on API error to clear spinner", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const initialTree = [{ name: "subdir", path: "subdir", is_dir: true }];
       useRepoStore.setState({ fileTree: initialTree });
 
@@ -179,11 +181,15 @@ describe("useRepoStore", () => {
     });
 
     it("sets empty children on timeout to clear spinner", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const initialTree = [{ name: "subdir", path: "subdir", is_dir: true }];
       useRepoStore.setState({ fileTree: initialTree });
 
-      mockedAxios.get.mockRejectedValueOnce(new Error("timeout of 15000ms exceeded"));
+      mockedAxios.get.mockRejectedValueOnce(
+        new Error("timeout of 15000ms exceeded"),
+      );
 
       await useRepoStore.getState().loadDirChildren("subdir");
       consoleSpy.mockRestore();
@@ -210,9 +216,7 @@ describe("useRepoStore", () => {
           name: "docs",
           path: "docs",
           is_dir: true,
-          children: [
-            { name: "file.md", path: "docs/file.md", is_dir: false },
-          ],
+          children: [{ name: "file.md", path: "docs/file.md", is_dir: false }],
         },
       ];
       useRepoStore.setState({ fileTree: existingTree });
@@ -243,16 +247,12 @@ describe("useRepoStore", () => {
       const callOrder: string[] = [];
 
       mockedAxios.get.mockImplementation(async (url: string) => {
-        const path = decodeURIComponent(
-          url.replace("/api/tree?path=", ""),
-        );
+        const path = decodeURIComponent(url.replace("/api/tree?path=", ""));
         callOrder.push(path);
 
         if (path === "docs") {
           return {
-            data: [
-              { name: "design", path: "docs/design", is_dir: true },
-            ],
+            data: [{ name: "design", path: "docs/design", is_dir: true }],
           };
         }
         if (path === "docs/design") {
@@ -269,9 +269,7 @@ describe("useRepoStore", () => {
         return { data: [] };
       });
 
-      await useRepoStore
-        .getState()
-        .loadPathDirectories("docs/design/spec.md");
+      await useRepoStore.getState().loadPathDirectories("docs/design/spec.md");
 
       // Verify sequential order: parent loaded before child
       expect(callOrder).toEqual(["docs", "docs/design"]);
@@ -294,9 +292,7 @@ describe("useRepoStore", () => {
             name: "docs",
             path: "docs",
             is_dir: true,
-            children: [
-              { name: "design", path: "docs/design", is_dir: true },
-            ],
+            children: [{ name: "design", path: "docs/design", is_dir: true }],
           },
         ],
       });
@@ -311,9 +307,7 @@ describe("useRepoStore", () => {
         ],
       });
 
-      await useRepoStore
-        .getState()
-        .loadPathDirectories("docs/design/spec.md");
+      await useRepoStore.getState().loadPathDirectories("docs/design/spec.md");
 
       // Only "docs/design" should be loaded (docs already has children)
       expect(mockedAxios.get).toHaveBeenCalledTimes(1);
@@ -341,9 +335,7 @@ describe("useRepoStore", () => {
       const resolveOrder: string[] = [];
 
       mockedAxios.get.mockImplementation(async (url: string) => {
-        const path = decodeURIComponent(
-          url.replace("/api/tree?path=", ""),
-        );
+        const path = decodeURIComponent(url.replace("/api/tree?path=", ""));
         resolveOrder.push(path);
 
         if (path === "a") {
@@ -353,17 +345,13 @@ describe("useRepoStore", () => {
         }
         if (path === "a/b") {
           return {
-            data: [
-              { name: "file.md", path: "a/b/file.md", is_dir: false },
-            ],
+            data: [{ name: "file.md", path: "a/b/file.md", is_dir: false }],
           };
         }
         return { data: [] };
       });
 
-      await useRepoStore
-        .getState()
-        .loadPathDirectories("a/b/file.md");
+      await useRepoStore.getState().loadPathDirectories("a/b/file.md");
 
       // Parent loaded first, child loaded second
       expect(resolveOrder).toEqual(["a", "a/b"]);
@@ -432,9 +420,7 @@ describe("useRepoStore", () => {
             name: "docs",
             path: "docs",
             is_dir: true,
-            children: [
-              { name: "old.md", path: "docs/old.md", is_dir: false },
-            ],
+            children: [{ name: "old.md", path: "docs/old.md", is_dir: false }],
           },
         ],
         expandedDirs: { docs: true },
@@ -638,9 +624,7 @@ describe("useRepoStore", () => {
         }
         if (path === "good") {
           return {
-            data: [
-              { name: "file.md", path: "good/file.md", is_dir: false },
-            ],
+            data: [{ name: "file.md", path: "good/file.md", is_dir: false }],
           };
         }
         if (path === "bad") {

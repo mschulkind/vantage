@@ -593,64 +593,64 @@ export const ViewerPage: React.FC = () => {
 
       {/* Sidebar - hidden on repo picker page */}
       {showSidebar && (
-      <div
-        className={cn(
-          "w-72 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-800 shadow-sm",
-          "fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-auto",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        <div className="h-14 px-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-              <GitBranch size={18} className="text-white" />
+        <div
+          className={cn(
+            "w-72 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-800 shadow-sm",
+            "fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-auto",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+        >
+          <div className="h-14 px-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                <GitBranch size={18} className="text-white" />
+              </div>
+              <AppLink
+                to="/"
+                className="font-semibold text-lg tracking-tight hover:text-blue-600 transition-colors no-underline text-inherit dark:text-slate-100"
+                onBeforeNavigate={() => {
+                  if (isMultiRepo) setCurrentRepo(null);
+                }}
+              >
+                Vantage
+              </AppLink>
             </div>
-            <AppLink
-              to="/"
-              className="font-semibold text-lg tracking-tight hover:text-blue-600 transition-colors no-underline text-inherit dark:text-slate-100"
-              onBeforeNavigate={() => {
-                if (isMultiRepo) setCurrentRepo(null);
-              }}
-            >
-              Vantage
-            </AppLink>
+            <div className="flex items-center gap-1">
+              <a
+                href="https://github.com/mschulkind-oss/vantage"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                title="View on GitHub"
+              >
+                <Github size={16} />
+              </a>
+              <KeyboardShortcutsButton onClick={() => setShortcutsOpen(true)} />
+              <SettingsDropdown
+                showEmptyDirs={showEmptyDirs}
+                onShowEmptyDirsChange={setShowEmptyDirs}
+                showHidden={showHidden}
+                onShowHiddenChange={setShowHidden}
+                showGitignored={showGitignored}
+                onShowGitignoredChange={setShowGitignored}
+                keyboardShortcutsEnabled={keyboardShortcutsEnabled}
+                onKeyboardShortcutsEnabledChange={setKeyboardShortcutsEnabled}
+                onOpenWhatsNew={whatsNew.open}
+              />
+              <button
+                className="md:hidden p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close sidebar"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <a
-              href="https://github.com/mschulkind/vantage"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-              title="View on GitHub"
-            >
-              <Github size={16} />
-            </a>
-            <KeyboardShortcutsButton onClick={() => setShortcutsOpen(true)} />
-            <SettingsDropdown
-              showEmptyDirs={showEmptyDirs}
-              onShowEmptyDirsChange={setShowEmptyDirs}
-              showHidden={showHidden}
-              onShowHiddenChange={setShowHidden}
-              showGitignored={showGitignored}
-              onShowGitignoredChange={setShowGitignored}
-              keyboardShortcutsEnabled={keyboardShortcutsEnabled}
-              onKeyboardShortcutsEnabledChange={setKeyboardShortcutsEnabled}
-              onOpenWhatsNew={whatsNew.open}
-            />
-            <button
-              className="md:hidden p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"
-              onClick={() => setSidebarOpen(false)}
-              aria-label="Close sidebar"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto py-2 px-2">
-          {/* File tree (sidebar only shows when a repo is selected) */}
-          <>
-            {/* Show current repo name with back button in multi-repo mode */}
-            {isMultiRepo && currentRepo && (
+          <div className="flex-1 overflow-y-auto py-2 px-2">
+            {/* File tree (sidebar only shows when a repo is selected) */}
+            <>
+              {/* Show current repo name with back button in multi-repo mode */}
+              {isMultiRepo && currentRepo && (
                 <AppLink
                   to="/"
                   onBeforeNavigate={() => {
@@ -663,271 +663,325 @@ export const ViewerPage: React.FC = () => {
                   <span className="font-medium">{currentRepo}</span>
                 </AppLink>
               )}
-            <FileTree nodes={fileTree} />
-          </>
-        </div>
-        {/* Recent Files Section - always visible, with spinner when loading */}
-        {(!isMultiRepo || currentRepo) && (
-          <div className="border-t border-slate-200 dark:border-slate-700 px-2 py-2 shrink-0">
-            <button
-              onClick={() => setRecentsModalOpen(true)}
-              className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center space-x-1.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors w-full"
-            >
-              <Clock size={12} />
-              <span>Recent</span>
-              {isRecentLoading && (
-                <Loader2 size={10} className="animate-spin text-slate-400" />
-              )}
-            </button>
-            <div className="space-y-0.5 overflow-y-auto h-40">
-              {isRecentLoading && recentFiles.length === 0 ? (
-                <div className="flex flex-col space-y-2 px-2 py-1">
-                  {[1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className="flex items-center space-x-2 animate-pulse"
-                    >
-                      <div className="w-3 h-3 bg-slate-200 rounded shrink-0" />
-                      <div className="h-3 bg-slate-200 rounded flex-1" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                recentFiles.map((file) => {
-                  const parts = file.path.split("/");
-                  const fileName = parts.pop() || "";
-                  const parentDir = parts.length > 0 ? parts.join("/") : "";
-                  return (
-                    <RecentFilePopover key={file.path} file={file}>
-                      <AppLink
-                        to={buildPath(file.path)}
-                        className={cn(
-                          "w-full flex items-start py-1.5 px-2 text-left rounded-md text-xs transition-all duration-150 no-underline",
-                          "hover:bg-slate-100 dark:hover:bg-slate-700",
-                          currentPath === file.path &&
-                            "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
-                          recentlyChangedPaths.has(file.path) &&
-                            "animate-flash-update",
-                        )}
-                      >
-                        <File
-                          size={13}
-                          className={cn(
-                            "mr-1.5 mt-0.5 shrink-0",
-                            file.untracked ? "text-amber-400" : "text-slate-400",
-                          )}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="truncate text-slate-700 dark:text-slate-300 font-medium">
-                              {fileName}
-                            </span>
-                            <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0">
-                              <RelativeTime date={file.date} addSuffix={false} />
-                            </span>
-                          </div>
-                          {parentDir && (
-                            <div className="truncate text-slate-400">
-                              {parentDir}/
-                            </div>
-                          )}
-                        </div>
-                      </AppLink>
-                    </RecentFilePopover>
-                  );
-                })
-              )}
-            </div>
+              <FileTree nodes={fileTree} />
+            </>
           </div>
-        )}
-      </div>
+          {/* Recent Files Section - always visible, with spinner when loading */}
+          {(!isMultiRepo || currentRepo) && (
+            <div className="border-t border-slate-200 dark:border-slate-700 px-2 py-2 shrink-0">
+              <button
+                onClick={() => setRecentsModalOpen(true)}
+                className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center space-x-1.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors w-full"
+              >
+                <Clock size={12} />
+                <span>Recent</span>
+                {isRecentLoading && (
+                  <Loader2 size={10} className="animate-spin text-slate-400" />
+                )}
+              </button>
+              <div className="space-y-0.5 overflow-y-auto h-40">
+                {isRecentLoading && recentFiles.length === 0 ? (
+                  <div className="flex flex-col space-y-2 px-2 py-1">
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="flex items-center space-x-2 animate-pulse"
+                      >
+                        <div className="w-3 h-3 bg-slate-200 rounded shrink-0" />
+                        <div className="h-3 bg-slate-200 rounded flex-1" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  recentFiles.map((file) => {
+                    const parts = file.path.split("/");
+                    const fileName = parts.pop() || "";
+                    const parentDir = parts.length > 0 ? parts.join("/") : "";
+                    return (
+                      <RecentFilePopover key={file.path} file={file}>
+                        <AppLink
+                          to={buildPath(file.path)}
+                          className={cn(
+                            "w-full flex items-start py-1.5 px-2 text-left rounded-md text-xs transition-all duration-150 no-underline",
+                            "hover:bg-slate-100 dark:hover:bg-slate-700",
+                            currentPath === file.path &&
+                              "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+                            recentlyChangedPaths.has(file.path) &&
+                              "animate-flash-update",
+                          )}
+                        >
+                          <File
+                            size={13}
+                            className={cn(
+                              "mr-1.5 mt-0.5 shrink-0",
+                              file.untracked
+                                ? "text-amber-400"
+                                : "text-slate-400",
+                            )}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="truncate text-slate-700 dark:text-slate-300 font-medium">
+                                {fileName}
+                              </span>
+                              <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0">
+                                <RelativeTime
+                                  date={file.date}
+                                  addSuffix={false}
+                                />
+                              </span>
+                            </div>
+                            {parentDir && (
+                              <div className="truncate text-slate-400">
+                                {parentDir}/
+                              </div>
+                            )}
+                          </div>
+                        </AppLink>
+                      </RecentFilePopover>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-slate-900 min-w-0">
         {/* Header / Breadcrumbs - hidden on repo picker page */}
         {showSidebar ? (
-        <div className="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center px-3 md:px-6 justify-between shrink-0 bg-white dark:bg-slate-800 gap-2">
-          <div className="flex items-center min-w-0 gap-2">
-            <button
-              className="md:hidden p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open sidebar"
-            >
-              <Menu size={20} />
-            </button>
-            <nav className="flex items-center text-sm space-x-1 min-w-0 overflow-hidden">
-              <AppLink
-                to={isMultiRepo && currentRepo ? `/${currentRepo}` : "/"}
-                className="text-slate-500 hover:text-blue-600 font-medium transition-colors shrink-0 no-underline"
-              >
-                {isMultiRepo && currentRepo ? currentRepo : "root"}
-              </AppLink>
-              {breadcrumbs.map((part, i) => (
-                <React.Fragment key={i}>
-                  <ChevronRight size={14} className="text-slate-300 shrink-0" />
-                  {i < breadcrumbs.length - 1 ? (
-                    <AppLink
-                      to={buildPath(
-                        currentPath
-                          ?.split("/")
-                          .slice(0, i + 1)
-                          .join("/") || ".",
-                      )}
-                      className="text-slate-500 hover:text-blue-600 transition-colors no-underline hidden sm:inline"
-                    >
-                      {part}
-                    </AppLink>
-                  ) : (
-                    <span className="font-semibold text-slate-900 dark:text-slate-100 truncate">
-                      {part}
-                    </span>
-                  )}
-                </React.Fragment>
-              ))}
-            </nav>
-          </div>
-
-          {latestCommit ? (
-            <div className="flex items-center space-x-2 shrink-0">
-              {fileGitStatus && (
-                <button
-                  onClick={handleCommitClick}
-                  className="flex items-center space-x-1.5 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors cursor-pointer"
-                  title="View uncommitted changes"
-                >
-                  <GitBranch size={12} />
-                  <span className="font-medium hidden sm:inline">
-                    {fileGitStatus === "modified" ? "Modified" : fileGitStatus === "added" ? "Added" : fileGitStatus === "deleted" ? "Deleted" : fileGitStatus}
-                  </span>
-                </button>
-              )}
+          <div className="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center px-3 md:px-6 justify-between shrink-0 bg-white dark:bg-slate-800 gap-2">
+            <div className="flex items-center min-w-0 gap-2">
               <button
-                onClick={() => latestCommit && currentPath && fetchDiff(currentPath, latestCommit.hexsha)}
-                className="hidden sm:flex items-center space-x-3 text-xs group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 -mx-2 transition-colors"
-                title={`${formatDateTime(latestCommit.date)} — click to view diff`}
+                className="md:hidden p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0"
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Open sidebar"
               >
-                <div className="flex items-center space-x-1.5 text-slate-500 dark:text-slate-400">
+                <Menu size={20} />
+              </button>
+              <nav className="flex items-center text-sm space-x-1 min-w-0 overflow-hidden">
+                <AppLink
+                  to={isMultiRepo && currentRepo ? `/${currentRepo}` : "/"}
+                  className="text-slate-500 hover:text-blue-600 font-medium transition-colors shrink-0 no-underline"
+                >
+                  {isMultiRepo && currentRepo ? currentRepo : "root"}
+                </AppLink>
+                {breadcrumbs.map((part, i) => (
+                  <React.Fragment key={i}>
+                    <ChevronRight
+                      size={14}
+                      className="text-slate-300 shrink-0"
+                    />
+                    {i < breadcrumbs.length - 1 ? (
+                      <AppLink
+                        to={buildPath(
+                          currentPath
+                            ?.split("/")
+                            .slice(0, i + 1)
+                            .join("/") || ".",
+                        )}
+                        className="text-slate-500 hover:text-blue-600 transition-colors no-underline hidden sm:inline"
+                      >
+                        {part}
+                      </AppLink>
+                    ) : (
+                      <span className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                        {part}
+                      </span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </nav>
+            </div>
+
+            {latestCommit ? (
+              <div className="flex items-center space-x-2 shrink-0">
+                {fileGitStatus && (
+                  <button
+                    onClick={handleCommitClick}
+                    className="flex items-center space-x-1.5 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors cursor-pointer"
+                    title="View uncommitted changes"
+                  >
+                    <GitBranch size={12} />
+                    <span className="font-medium hidden sm:inline">
+                      {fileGitStatus === "modified"
+                        ? "Modified"
+                        : fileGitStatus === "added"
+                          ? "Added"
+                          : fileGitStatus === "deleted"
+                            ? "Deleted"
+                            : fileGitStatus}
+                    </span>
+                  </button>
+                )}
+                <button
+                  onClick={() =>
+                    latestCommit &&
+                    currentPath &&
+                    fetchDiff(currentPath, latestCommit.hexsha)
+                  }
+                  className="hidden sm:flex items-center space-x-3 text-xs group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 -mx-2 transition-colors"
+                  title={`${formatDateTime(latestCommit.date)} — click to view diff`}
+                >
+                  <div className="flex items-center space-x-1.5 text-slate-500 dark:text-slate-400">
+                    <Clock size={14} />
+                    <span>
+                      <RelativeTime date={latestCommit.date} />
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-600">
+                      ·
+                    </span>
+                    <span className="text-slate-400 dark:text-slate-500">
+                      {formatDateTime(latestCommit.date)}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 group-hover:bg-slate-200 dark:group-hover:bg-slate-600 px-2.5 py-1.5 rounded-md transition-colors">
+                    <MessageSquare size={12} className="text-slate-400" />
+                    <span className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[200px]">
+                      {latestCommit.message}
+                    </span>
+                  </div>
+                </button>
+                {/* Mobile: just show clock icon as commit button */}
+                <button
+                  onClick={() =>
+                    latestCommit &&
+                    currentPath &&
+                    fetchDiff(currentPath, latestCommit.hexsha)
+                  }
+                  className="sm:hidden flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors"
+                  title="View diff"
+                >
                   <Clock size={14} />
                   <span>
-                    <RelativeTime date={latestCommit.date} />
+                    <RelativeTime date={latestCommit.date} addSuffix={false} />
                   </span>
-                  <span className="text-slate-300 dark:text-slate-600">·</span>
-                  <span className="text-slate-400 dark:text-slate-500">
-                    {formatDateTime(latestCommit.date)}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 group-hover:bg-slate-200 dark:group-hover:bg-slate-600 px-2.5 py-1.5 rounded-md transition-colors">
-                  <MessageSquare size={12} className="text-slate-400" />
-                  <span className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[200px]">
-                    {latestCommit.message}
-                  </span>
-                </div>
-              </button>
-              {/* Mobile: just show clock icon as commit button */}
-              <button
-                onClick={() => latestCommit && currentPath && fetchDiff(currentPath, latestCommit.hexsha)}
-                className="sm:hidden flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors"
-                title="View diff"
-              >
-                <Clock size={14} />
-                <span><RelativeTime date={latestCommit.date} addSuffix={false} /></span>
-              </button>
-              {currentPath &&
-                currentPath.toLowerCase().endsWith(".md") &&
-                history.length >= 1 && (
-                  <AppLink
-                    to={
-                      isMultiRepo && currentRepo
-                        ? `/history/${currentRepo}/${currentPath}`
-                        : `/history/${currentPath}`
-                    }
-                    className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors no-underline"
-                    title="View full history"
-                  >
-                    <History size={14} />
-                    <span className="hidden sm:inline">
-                      {history.length} commits
-                    </span>
-                  </AppLink>
-                )}
-              {currentPath && repoRootPath && (
-                <button
-                  onClick={handleCopyPath}
-                  className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors cursor-pointer"
-                  title={`Copy absolute path: ${repoRootPath}/${currentPath}`}
-                >
-                  {pathCopied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                  <span className="hidden sm:inline">{pathCopied ? "Copied!" : "Path"}</span>
                 </button>
-              )}
-              {currentPath && currentPath.toLowerCase().endsWith(".md") && (
+                {currentPath &&
+                  currentPath.toLowerCase().endsWith(".md") &&
+                  history.length >= 1 && (
+                    <AppLink
+                      to={
+                        isMultiRepo && currentRepo
+                          ? `/history/${currentRepo}/${currentPath}`
+                          : `/history/${currentPath}`
+                      }
+                      className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors no-underline"
+                      title="View full history"
+                    >
+                      <History size={14} />
+                      <span className="hidden sm:inline">
+                        {history.length} commits
+                      </span>
+                    </AppLink>
+                  )}
+                {currentPath && repoRootPath && (
+                  <button
+                    onClick={handleCopyPath}
+                    className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors cursor-pointer"
+                    title={`Copy absolute path: ${repoRootPath}/${currentPath}`}
+                  >
+                    {pathCopied ? (
+                      <Check size={14} className="text-green-500" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                    <span className="hidden sm:inline">
+                      {pathCopied ? "Copied!" : "Path"}
+                    </span>
+                  </button>
+                )}
+                {currentPath && currentPath.toLowerCase().endsWith(".md") && (
+                  <button
+                    onClick={() => {
+                      setShowRaw((v) => !v);
+                      setCopied(false);
+                    }}
+                    className={cn(
+                      "flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 transition-colors cursor-pointer",
+                      showRaw
+                        ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30"
+                        : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                    )}
+                    title={showRaw ? "View rendered" : "View raw markdown"}
+                  >
+                    <Code size={14} />
+                    <span className="hidden sm:inline">
+                      {showRaw ? "Rendered" : "Raw"}
+                    </span>
+                  </button>
+                )}
+              </div>
+            ) : currentPath && currentPath.toLowerCase().endsWith(".md") ? (
+              <div className="flex items-center space-x-2 shrink-0">
+                {!isStaticMode() && (
+                  <button
+                    onClick={() => currentPath && fetchWorkingDiff(currentPath)}
+                    className="flex items-center space-x-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+                    title="View file content as diff"
+                  >
+                    <FileQuestion size={14} />
+                    <span className="font-medium hidden sm:inline">
+                      Untracked file
+                    </span>
+                  </button>
+                )}
+                {fileMtime && (
+                  <div
+                    className="hidden sm:flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 px-2 py-1.5"
+                    title={formatDateTime(fileMtime)}
+                  >
+                    <Clock size={14} />
+                    <span>
+                      <RelativeTime date={fileMtime} />
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-600">
+                      ·
+                    </span>
+                    <span className="text-slate-400 dark:text-slate-500">
+                      {formatDateTime(fileMtime)}
+                    </span>
+                  </div>
+                )}
+                {currentPath && repoRootPath && (
+                  <button
+                    onClick={handleCopyPath}
+                    className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors cursor-pointer"
+                    title={`Copy absolute path: ${repoRootPath}/${currentPath}`}
+                  >
+                    {pathCopied ? (
+                      <Check size={14} className="text-green-500" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                    <span className="hidden sm:inline">
+                      {pathCopied ? "Copied!" : "Path"}
+                    </span>
+                  </button>
+                )}
                 <button
-                  onClick={() => { setShowRaw((v) => !v); setCopied(false); }}
+                  onClick={() => {
+                    setShowRaw((v) => !v);
+                    setCopied(false);
+                  }}
                   className={cn(
                     "flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 transition-colors cursor-pointer",
                     showRaw
                       ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30"
-                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50",
                   )}
                   title={showRaw ? "View rendered" : "View raw markdown"}
                 >
                   <Code size={14} />
-                  <span className="hidden sm:inline">{showRaw ? "Rendered" : "Raw"}</span>
-                </button>
-              )}
-            </div>
-          ) : currentPath && currentPath.toLowerCase().endsWith(".md") ? (
-            <div className="flex items-center space-x-2 shrink-0">
-              {!isStaticMode() && (
-                <button
-                  onClick={() => currentPath && fetchWorkingDiff(currentPath)}
-                  className="flex items-center space-x-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
-                  title="View file content as diff"
-                >
-                  <FileQuestion size={14} />
-                  <span className="font-medium hidden sm:inline">
-                    Untracked file
+                  <span className="hidden sm:inline">
+                    {showRaw ? "Rendered" : "Raw"}
                   </span>
                 </button>
-              )}
-              {fileMtime && (
-                <div
-                  className="hidden sm:flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 px-2 py-1.5"
-                  title={formatDateTime(fileMtime)}
-                >
-                  <Clock size={14} />
-                  <span><RelativeTime date={fileMtime} /></span>
-                  <span className="text-slate-300 dark:text-slate-600">·</span>
-                  <span className="text-slate-400 dark:text-slate-500">{formatDateTime(fileMtime)}</span>
-                </div>
-              )}
-              {currentPath && repoRootPath && (
-                <button
-                  onClick={handleCopyPath}
-                  className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors cursor-pointer"
-                  title={`Copy absolute path: ${repoRootPath}/${currentPath}`}
-                >
-                  {pathCopied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                  <span className="hidden sm:inline">{pathCopied ? "Copied!" : "Path"}</span>
-                </button>
-              )}
-              <button
-                onClick={() => { setShowRaw((v) => !v); setCopied(false); }}
-                className={cn(
-                  "flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 transition-colors cursor-pointer",
-                  showRaw
-                    ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30"
-                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                )}
-                title={showRaw ? "View rendered" : "View raw markdown"}
-              >
-                <Code size={14} />
-                <span className="hidden sm:inline">{showRaw ? "Rendered" : "Raw"}</span>
-              </button>
-            </div>
-          ) : null}
-        </div>
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {/* Viewer */}
@@ -972,7 +1026,7 @@ export const ViewerPage: React.FC = () => {
                   </p>
                 </div>
               ) : (
-              <div className="pb-8">
+                <div className="pb-8">
                   {showRaw ? (
                     <div className="relative">
                       <button
@@ -992,10 +1046,10 @@ export const ViewerPage: React.FC = () => {
                       </pre>
                     </div>
                   ) : (
-                  <MarkdownViewer
-                    content={fileContent.content}
-                    currentPath={fileContent.path}
-                  />
+                    <MarkdownViewer
+                      content={fileContent.content}
+                      currentPath={fileContent.path}
+                    />
                   )}
                 </div>
               )
@@ -1012,7 +1066,8 @@ export const ViewerPage: React.FC = () => {
                       Projects
                     </h1>
                     <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-                      {repos.length} {repos.length === 1 ? "repository" : "repositories"}
+                      {repos.length}{" "}
+                      {repos.length === 1 ? "repository" : "repositories"}
                     </p>
                   </div>
                   <button
@@ -1159,10 +1214,7 @@ export const ViewerPage: React.FC = () => {
         onClose={() => setShortcutsOpen(false)}
       />
       {/* What's New Modal */}
-      <WhatsNewModal
-        isOpen={whatsNew.isOpen}
-        onClose={whatsNew.close}
-      />
+      <WhatsNewModal isOpen={whatsNew.isOpen} onClose={whatsNew.close} />
     </div>
   );
 };

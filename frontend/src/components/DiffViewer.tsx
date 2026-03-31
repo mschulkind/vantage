@@ -88,12 +88,14 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
           <div className="flex flex-col space-y-2">
             <div className="flex items-center space-x-3">
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center",
-                isWorkingDiff
-                  ? "bg-gradient-to-br from-green-500 to-emerald-600"
-                  : "bg-gradient-to-br from-amber-500 to-orange-600",
-              )}>
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center",
+                  isWorkingDiff
+                    ? "bg-gradient-to-br from-green-500 to-emerald-600"
+                    : "bg-gradient-to-br from-amber-500 to-orange-600",
+                )}
+              >
                 <GitCommitIcon size={16} className="text-white" />
               </div>
               <div>
@@ -128,7 +130,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onClose }) => {
           </div>
           <div className="flex items-center space-x-2 text-slate-600 dark:text-slate-400">
             <Calendar size={14} className="text-slate-400" />
-            <span><RelativeTime date={diff.commit_date} /></span>
+            <span>
+              <RelativeTime date={diff.commit_date} />
+            </span>
           </div>
           <div className="flex-1 text-right">
             <span className="text-slate-500 dark:text-slate-400 font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200/50 dark:border-slate-700">

@@ -201,11 +201,12 @@ export const RecentsModal: React.FC<RecentsModalProps> = ({
                               {file.message}
                             </span>
                           )}
-                          {file.message && (file.author_name || file.hexsha) && (
-                            <span className="text-slate-300 dark:text-slate-600">
-                              ·
-                            </span>
-                          )}
+                          {file.message &&
+                            (file.author_name || file.hexsha) && (
+                              <span className="text-slate-300 dark:text-slate-600">
+                                ·
+                              </span>
+                            )}
                           {file.author_name && (
                             <span className="shrink-0 inline-flex items-center gap-0.5">
                               <User size={10} />

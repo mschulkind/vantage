@@ -30,7 +30,8 @@ export const useWebSocket = () => {
   const disconnectedAtRef = useRef<number | null>(null);
   const connectCountRef = useRef(0);
 
-  const { currentPath, loadFile, refreshExpandedTree, viewDirectory } = useRepoStore();
+  const { currentPath, loadFile, refreshExpandedTree, viewDirectory } =
+    useRepoStore();
   const { fetchStatus, fetchRecentFiles } = useGitStore();
   const markPathsChanged = useRepoStore((s) => s.markPathsChanged);
 
@@ -77,18 +78,14 @@ export const useWebSocket = () => {
     }
 
     // Guard: don't fire API calls before the repo store is initialised
-    const { reposLoaded, isMultiRepo, currentRepo } =
-      useRepoStore.getState();
+    const { reposLoaded, isMultiRepo, currentRepo } = useRepoStore.getState();
     if (!reposLoaded) return;
     if (isMultiRepo && !currentRepo) return;
 
     pendingPathsRef.current = new Set();
     processingRef.current = true;
 
-    console.log(
-      "[ws] Processing batch: %d paths changed",
-      changedPaths.size,
-    );
+    console.log("[ws] Processing batch: %d paths changed", changedPaths.size);
 
     // Trigger flash animation for changed paths
     markPathsChanged(changedPaths);
@@ -127,8 +124,7 @@ export const useWebSocket = () => {
     // Guard: don't fire API calls before the repo store is initialised.
     // Before loadRepos() completes, isMultiRepo defaults to false and
     // getApiBase() returns "/api", which 404s in multi-repo setups.
-    const { reposLoaded, isMultiRepo, currentRepo } =
-      useRepoStore.getState();
+    const { reposLoaded, isMultiRepo, currentRepo } = useRepoStore.getState();
     if (!reposLoaded) return;
     if (isMultiRepo && !currentRepo) return;
 
@@ -145,7 +141,13 @@ export const useWebSocket = () => {
     }
     refreshExpandedTree();
     fetchRecentFiles();
-  }, [loadFile, refreshExpandedTree, fetchStatus, viewDirectory, fetchRecentFiles]);
+  }, [
+    loadFile,
+    refreshExpandedTree,
+    fetchStatus,
+    viewDirectory,
+    fetchRecentFiles,
+  ]);
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
@@ -213,11 +215,7 @@ export const useWebSocket = () => {
     const host = window.location.host;
     const url = `${protocol}//${host}/api/ws`;
     const connectNum = ++connectCountRef.current;
-    console.log(
-      "[ws] Connecting (#%d) to %s",
-      connectNum,
-      url,
-    );
+    console.log("[ws] Connecting (#%d) to %s", connectNum, url);
     const socket = new WebSocket(url);
 
     socket.onopen = () => {
@@ -307,7 +305,9 @@ export const useWebSocket = () => {
         console.log("[ws] Tab hidden");
       } else if (document.visibilityState === "visible") {
         const hiddenMs =
-          hiddenAtRef.current !== null ? Date.now() - hiddenAtRef.current : Infinity;
+          hiddenAtRef.current !== null
+            ? Date.now() - hiddenAtRef.current
+            : Infinity;
         hiddenAtRef.current = null;
         const hiddenStr =
           hiddenMs === Infinity

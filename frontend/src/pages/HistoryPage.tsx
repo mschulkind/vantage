@@ -23,7 +23,6 @@ import { cn } from "../lib/utils";
 
 type HistoryTab = "commits" | "snapshots";
 
-
 export const HistoryPage: React.FC = () => {
   const { "*": pathParam } = useParams();
   const {
@@ -155,12 +154,14 @@ export const HistoryPage: React.FC = () => {
               >
                 <ArrowLeft size={20} />
               </AppLink>
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br",
-                activeTab === "snapshots"
-                  ? "from-violet-500 to-purple-600"
-                  : "from-blue-500 to-indigo-600",
-              )}>
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br",
+                  activeTab === "snapshots"
+                    ? "from-violet-500 to-purple-600"
+                    : "from-blue-500 to-indigo-600",
+                )}
+              >
                 {activeTab === "snapshots" ? (
                   <Camera size={18} className="text-white" />
                 ) : (
@@ -253,15 +254,23 @@ export const HistoryPage: React.FC = () => {
           <Info size={14} className="shrink-0 mt-0.5" />
           {activeTab === "commits" ? (
             <span>
-              <strong className="text-slate-700 dark:text-slate-300">Commits</strong> are intentional revisions
-              {jj.info?.is_jj ? " (jj revisions)" : " (git commits)"}
-              {" "}— each one represents a deliberate save point where changes were described and committed.
+              <strong className="text-slate-700 dark:text-slate-300">
+                Commits
+              </strong>{" "}
+              are intentional revisions
+              {jj.info?.is_jj ? " (jj revisions)" : " (git commits)"} — each one
+              represents a deliberate save point where changes were described
+              and committed.
             </span>
           ) : (
             <span>
-              <strong className="text-slate-700 dark:text-slate-300">Snapshots</strong> are automatic saves that jj creates
-              every time you modify a file. They capture every intermediate state of your working copy,
-              even changes you haven&apos;t committed yet. Use this to recover lost work or see how a file evolved.
+              <strong className="text-slate-700 dark:text-slate-300">
+                Snapshots
+              </strong>{" "}
+              are automatic saves that jj creates every time you modify a file.
+              They capture every intermediate state of your working copy, even
+              changes you haven&apos;t committed yet. Use this to recover lost
+              work or see how a file evolved.
             </span>
           )}
         </div>
@@ -277,84 +286,86 @@ export const HistoryPage: React.FC = () => {
               onEvologToggle={handleEvologToggle}
             />
           ) : isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-slate-200 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin" />
-          </div>
-        ) : history.length === 0 ? (
-          <div className="text-center py-20 text-slate-400">
-            <GitBranch size={48} className="mx-auto mb-4 text-slate-300" />
-            <p className="text-lg font-medium text-slate-500">
-              No commit history found
-            </p>
-            <p className="text-sm mt-1">This file may be untracked or new.</p>
-          </div>
-        ) : (
-          <div className="relative">
-            {/* Timeline line */}
-            <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-200 dark:bg-slate-700" />
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-4 border-slate-200 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin" />
+            </div>
+          ) : history.length === 0 ? (
+            <div className="text-center py-20 text-slate-400">
+              <GitBranch size={48} className="mx-auto mb-4 text-slate-300" />
+              <p className="text-lg font-medium text-slate-500">
+                No commit history found
+              </p>
+              <p className="text-sm mt-1">This file may be untracked or new.</p>
+            </div>
+          ) : (
+            <div className="relative">
+              {/* Timeline line */}
+              <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-200 dark:bg-slate-700" />
 
-            <div className="space-y-1">
-              {history.map((commit, index) => (
-                <div
-                  key={commit.hexsha}
-                  className="relative flex items-start group"
-                >
-                  {/* Timeline dot */}
+              <div className="space-y-1">
+                {history.map((commit, index) => (
                   <div
-                    className={cn(
-                      "relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1 transition-colors",
-                      index === 0
-                        ? "bg-blue-500 text-white"
-                        : "bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 text-slate-400 group-hover:border-blue-300 group-hover:text-blue-500",
-                    )}
+                    key={commit.hexsha}
+                    className="relative flex items-start group"
                   >
-                    <GitBranch size={16} />
-                  </div>
+                    {/* Timeline dot */}
+                    <div
+                      className={cn(
+                        "relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1 transition-colors",
+                        index === 0
+                          ? "bg-blue-500 text-white"
+                          : "bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 text-slate-400 group-hover:border-blue-300 group-hover:text-blue-500",
+                      )}
+                    >
+                      <GitBranch size={16} />
+                    </div>
 
-                  {/* Commit card */}
-                  <button
-                    onClick={() => handleCommitClick(commit.hexsha)}
-                    className={cn(
-                      "ml-4 flex-1 text-left bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 transition-all cursor-pointer",
-                      "hover:border-blue-200 dark:hover:border-blue-700 hover:shadow-md hover:bg-blue-50/30 dark:hover:bg-blue-900/20",
-                      index === 0 &&
-                        "border-blue-200 dark:border-blue-700 shadow-sm",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-1.5">
-                          <MessageSquare
-                            size={14}
-                            className="text-slate-400 shrink-0"
-                          />
-                          <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
-                            {commit.message}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-4 text-xs text-slate-500">
-                          <div className="flex items-center space-x-1.5">
-                            <User size={12} />
-                            <span>{commit.author_name}</span>
-                          </div>
-                          <div className="flex items-center space-x-1.5">
-                            <Clock size={12} />
-                            <span title={format(new Date(commit.date), "PPpp")}>
-                              <RelativeTime date={commit.date} />
+                    {/* Commit card */}
+                    <button
+                      onClick={() => handleCommitClick(commit.hexsha)}
+                      className={cn(
+                        "ml-4 flex-1 text-left bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 transition-all cursor-pointer",
+                        "hover:border-blue-200 dark:hover:border-blue-700 hover:shadow-md hover:bg-blue-50/30 dark:hover:bg-blue-900/20",
+                        index === 0 &&
+                          "border-blue-200 dark:border-blue-700 shadow-sm",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1.5">
+                            <MessageSquare
+                              size={14}
+                              className="text-slate-400 shrink-0"
+                            />
+                            <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                              {commit.message}
                             </span>
                           </div>
+                          <div className="flex items-center space-x-4 text-xs text-slate-500">
+                            <div className="flex items-center space-x-1.5">
+                              <User size={12} />
+                              <span>{commit.author_name}</span>
+                            </div>
+                            <div className="flex items-center space-x-1.5">
+                              <Clock size={12} />
+                              <span
+                                title={format(new Date(commit.date), "PPpp")}
+                              >
+                                <RelativeTime date={commit.date} />
+                              </span>
+                            </div>
+                          </div>
                         </div>
+                        <span className="font-mono text-xs text-slate-400 bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded-md border border-slate-100 dark:border-slate-600 shrink-0">
+                          {commit.hexsha.slice(0, 8)}
+                        </span>
                       </div>
-                      <span className="font-mono text-xs text-slate-400 bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded-md border border-slate-100 dark:border-slate-600 shrink-0">
-                        {commit.hexsha.slice(0, 8)}
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              ))}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )
+          )
         ) : activeTab === "snapshots" && jj.info?.is_jj ? (
           /* Snapshots tab — jj evolog of working copy */
           jj.isLoading ? (
@@ -367,7 +378,9 @@ export const HistoryPage: React.FC = () => {
               <p className="text-lg font-medium text-slate-500">
                 No snapshots found
               </p>
-              <p className="text-sm mt-1">jj hasn&apos;t captured any working-copy snapshots yet.</p>
+              <p className="text-sm mt-1">
+                jj hasn&apos;t captured any working-copy snapshots yet.
+              </p>
             </div>
           ) : (
             <SnapshotTimeline
@@ -376,7 +389,11 @@ export const HistoryPage: React.FC = () => {
                 if (filePath) {
                   const prevEntry = jj.evolog[index + 1];
                   if (prevEntry) {
-                    jj.fetchInterdiff(prevEntry.commit_id, entry.commit_id, filePath);
+                    jj.fetchInterdiff(
+                      prevEntry.commit_id,
+                      entry.commit_id,
+                      filePath,
+                    );
                   } else {
                     // Oldest snapshot — show full diff from parent
                     jj.fetchDiff(entry.commit_id, filePath);
@@ -711,14 +728,18 @@ const SnapshotTimeline: React.FC<{
               className={cn(
                 "ml-4 flex-1 text-left bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 transition-all cursor-pointer",
                 "hover:border-violet-200 dark:hover:border-violet-700 hover:shadow-md hover:bg-violet-50/30 dark:hover:bg-violet-900/20",
-                index === 0 && "border-violet-200 dark:border-violet-700 shadow-sm",
+                index === 0 &&
+                  "border-violet-200 dark:border-violet-700 shadow-sm",
                 entry.hidden && "opacity-60",
               )}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1.5">
-                    <MessageSquare size={14} className="text-slate-400 shrink-0" />
+                    <MessageSquare
+                      size={14}
+                      className="text-slate-400 shrink-0"
+                    />
                     <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
                       {entry.description || "(automatic snapshot)"}
                     </span>

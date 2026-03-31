@@ -2,8 +2,10 @@ import React, { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { shouldHandleInternalNavigation } from "../lib/navigation";
 
-interface AppLinkProps
-  extends Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "onClick"> {
+interface AppLinkProps extends Omit<
+  React.AnchorHTMLAttributes<HTMLAnchorElement>,
+  "onClick"
+> {
   /** The SPA route to navigate to (also used as href) */
   to: string;
   /** Optional click handler called before navigation. Return false to prevent. */

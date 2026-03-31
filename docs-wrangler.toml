@@ -1,0 +1,7 @@
+name = "vantage-docs"
+compatibility_date = "2025-12-01"
+main = "docs-worker.js"
+
+[assets]
+directory = "dist/docs"
+not_found_handling = "404-page"

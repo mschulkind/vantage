@@ -22,7 +22,7 @@ repos:
       - id: prettier
         name: prettier (JS/TS)
         types_or: [javascript, jsx, ts, tsx, json, yaml, markdown]
-        exclude: ^(package-lock\.json|.*\.lock|\.chrome-state/|landing/node_modules/|frontend/node_modules/)
+        exclude: ^(package-lock\.json|.*\.lock|\.chrome-state/|frontend/node_modules/)
         additional_dependencies:
           - prettier@3.4.2
 
@@ -41,9 +41,9 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^(\.chrome-state/|landing/node_modules/|frontend/node_modules/)
+        exclude: ^(\.chrome-state/|frontend/node_modules/)
       - id: end-of-file-fixer
-        exclude: ^(\.chrome-state/|landing/node_modules/|frontend/node_modules/)
+        exclude: ^(\.chrome-state/|frontend/node_modules/)
       - id: check-yaml
       - id: check-added-large-files
         args: [--maxkb=1000]

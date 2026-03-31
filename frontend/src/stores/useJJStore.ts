@@ -26,7 +26,11 @@ interface JJState {
   fetchLog: (path?: string, limit?: number) => Promise<void>;
   fetchEvolog: (rev?: string, limit?: number) => Promise<void>;
   fetchDiff: (rev: string, path?: string) => Promise<void>;
-  fetchInterdiff: (fromRev: string, toRev: string, path?: string) => Promise<void>;
+  fetchInterdiff: (
+    fromRev: string,
+    toRev: string,
+    path?: string,
+  ) => Promise<void>;
   setShowDiff: (show: boolean) => void;
   setShowEvolog: (show: boolean) => void;
   reset: () => void;
@@ -100,7 +104,10 @@ export const useJJStore = create<JJState>((set) => ({
     if (!base) return;
     set({ isDiffLoading: true });
     try {
-      const params: Record<string, string> = { from_rev: fromRev, to_rev: toRev };
+      const params: Record<string, string> = {
+        from_rev: fromRev,
+        to_rev: toRev,
+      };
       if (path) params.path = path;
       const res = await axios.get(`${base}/jj/interdiff`, { params });
       set({ diff: res.data, isDiffLoading: false, showDiff: true });

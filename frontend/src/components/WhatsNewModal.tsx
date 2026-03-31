@@ -146,10 +146,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                     <div key={section.title}>
                       <div className="flex items-center gap-1.5 mb-1.5">
                         {sectionIcons[section.title] || (
-                          <ChevronRight
-                            size={14}
-                            className="text-slate-400"
-                          />
+                          <ChevronRight size={14} className="text-slate-400" />
                         )}
                         <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           {section.title}
@@ -205,5 +202,3 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
     document.body,
   );
 };
-
-

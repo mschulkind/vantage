@@ -54,7 +54,10 @@ const getApiBase = (
 };
 
 // Build query string for tree endpoints, including filter state
-const getTreeParams = (path: string, extra?: Record<string, string>): string => {
+const getTreeParams = (
+  path: string,
+  extra?: Record<string, string>,
+): string => {
   const { showHidden, showGitignored } = useRepoStore.getState();
   const params = new URLSearchParams({ path });
   if (!showHidden) params.set("show_hidden", "false");
@@ -231,10 +234,14 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     const sorted = [...repos];
     if (repoSortMode === "recent") {
       sorted.sort((a, b) => {
-        if (!a.last_activity && !b.last_activity) return a.name.localeCompare(b.name);
+        if (!a.last_activity && !b.last_activity)
+          return a.name.localeCompare(b.name);
         if (!a.last_activity) return 1;
         if (!b.last_activity) return -1;
-        return new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime();
+        return (
+          new Date(b.last_activity).getTime() -
+          new Date(a.last_activity).getTime()
+        );
       });
     } else {
       sorted.sort((a, b) => a.name.localeCompare(b.name));

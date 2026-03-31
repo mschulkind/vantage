@@ -1,5 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Settings, Sun, Moon, FolderOpen, Keyboard, Sparkles, Eye, FileX } from "lucide-react";
+import {
+  Settings,
+  Sun,
+  Moon,
+  FolderOpen,
+  Keyboard,
+  Sparkles,
+  Eye,
+  FileX,
+} from "lucide-react";
 import { cn } from "../lib/utils";
 
 type Theme = "light" | "dark";
@@ -165,7 +174,10 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
               File Tree
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="flex items-center gap-2 cursor-pointer group" title="Include folders that don't contain any markdown files">
+              <label
+                className="flex items-center gap-2 cursor-pointer group"
+                title="Include folders that don't contain any markdown files"
+              >
                 <input
                   type="checkbox"
                   checked={showEmptyDirs}
@@ -209,7 +221,10 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
               <div className="h-px bg-slate-100 dark:bg-slate-700 mx-2 my-1" />
               <div className="px-3 py-2">
                 <button
-                  onClick={() => { onOpenWhatsNew(); setOpen(false); }}
+                  onClick={() => {
+                    onOpenWhatsNew();
+                    setOpen(false);
+                  }}
                   className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white w-full text-left py-1"
                 >
                   <Sparkles size={13} />

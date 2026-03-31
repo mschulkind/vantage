@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { FolderGit2, Search } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -45,7 +51,13 @@ function fuzzyMatch(
   return { match: true, score, indices };
 }
 
-function HighlightedName({ name, indices }: { name: string; indices: number[] }) {
+function HighlightedName({
+  name,
+  indices,
+}: {
+  name: string;
+  indices: number[];
+}) {
   const indexSet = new Set(indices);
   return (
     <span className="truncate">

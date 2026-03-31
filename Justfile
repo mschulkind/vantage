@@ -11,6 +11,14 @@ default:
 
 # Setup the entire project
 setup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Create a relocatable venv so shebangs use #!/usr/bin/env python
+    # instead of absolute paths — works across host and jail mounts.
+    if [ ! -d .venv ] || ! head -1 .venv/bin/pip | grep -q 'env python'; then
+        rm -rf .venv
+        uv venv --relocatable
+    fi
     uv sync
     cd frontend && npm install
 
@@ -73,7 +81,7 @@ format-py:
     uv run ruff format .
 
 format-js:
-    cd frontend && npm run format || true
+    cd frontend && npm run format
 
 format: format-py format-js
 
@@ -81,7 +89,7 @@ lint-py:
     uv run ruff check .
 
 lint-js:
-    cd frontend && npm run lint || true
+    cd frontend && npm run lint
 
 lint: lint-py lint-js
 
@@ -190,19 +198,19 @@ clean:
     python3 -c "import shutil; from pathlib import Path; \
         [shutil.rmtree(p) for p in [Path('dist'), Path('build'), Path('src/vantage/frontend_dist'), Path('src/vantage.egg-info')] if p.exists()]"
 
-# Build the static docs site and preview the full landing page + docs locally
-dev-site:
+# Build the static user guide docs
+build-docs:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "--- Building frontend ---"
     cd frontend && npm run build && cd ..
     echo "--- Building static user guide ---"
-    uv run vantage build userguide/ -o site/docs --frontend-dist frontend/dist -n "Vantage User Guide" --base-path /docs/
-    echo "--- Symlinking docs into landing/public for dev server ---"
-    ln -sfn ../../site/docs landing/public/docs
-    echo "--- Starting Astro dev server (landing + docs) ---"
-    echo "Open http://localhost:4321"
-    cd landing && npm run dev
+    uv run vantage build userguide/ -o dist/docs --frontend-dist frontend/dist -n "Vantage User Guide" --base-path /docs/
+    echo "--- Done: dist/docs/ ---"
+
+# Deploy user guide to Cloudflare Workers
+deploy-docs: build-docs
+    npx wrangler deploy --config docs-wrangler.toml
 
 # Push bookmarks to their respective git remotes
 push:

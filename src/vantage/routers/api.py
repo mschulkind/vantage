@@ -30,7 +30,7 @@ router = APIRouter()
 # Warmed on startup; refreshed in background periodically and on watcher events.
 _repo_activity_cache: dict[str, RepoInfo] = {}
 _repo_activity_cache_time: float = 0.0
-_REPO_ACTIVITY_TTL = 60.0  # seconds before background refresh
+_REPO_ACTIVITY_TTL = 30.0  # seconds before background refresh
 
 
 def get_fs_service(
@@ -204,10 +204,28 @@ async def warm_repo_cache() -> None:
 
 
 async def refresh_repo_cache_loop() -> None:
-    """Background task that periodically refreshes repo activity cache."""
+    """Background task that periodically refreshes repo activity cache.
+
+    Also re-scans source_dirs for newly cloned/created projects so they
+    appear without restarting the daemon.
+    """
     while True:
         await asyncio.sleep(_REPO_ACTIVITY_TTL)
         try:
+            daemon_config = get_daemon_config()
+            if daemon_config and daemon_config.source_dirs:
+                new_repos = daemon_config._discover_repos_from_source_dirs()
+                if new_repos:
+                    logger.info(
+                        "Discovered %d new repo(s): %s",
+                        len(new_repos),
+                        ", ".join(r.name for r in new_repos),
+                    )
+                    # Restart the file watcher so new repos get live-reload
+                    from vantage.services.watcher import signal_watcher_restart
+
+                    signal_watcher_restart()
+
             await warm_repo_cache()
         except Exception:
             logger.exception("Failed to refresh repo activity cache")

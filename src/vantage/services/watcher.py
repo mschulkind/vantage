@@ -11,6 +11,16 @@ from vantage.settings import get_daemon_config, settings
 
 logger = logging.getLogger(__name__)
 
+# Event used to signal the multi-repo watcher to restart (e.g. when new
+# repos are discovered).  The watcher thread checks this periodically.
+_watcher_stop_event = threading.Event()
+
+
+def signal_watcher_restart() -> None:
+    """Signal the multi-repo watcher to restart with updated repo list."""
+    _watcher_stop_event.set()
+
+
 # Extensions we care about for live-reload
 _WATCHED_EXTENSIONS = {".md"}
 
@@ -174,40 +184,18 @@ async def watch_multi_repo():
 
     Uses the synchronous ``watch()`` in a daemon thread so that the
     (potentially slow) inotify initialization never blocks the event loop.
+
+    When ``signal_watcher_restart()`` is called (e.g. after new repos are
+    discovered), the current watch loop exits and restarts with the
+    updated repo list from the daemon config.
     """
     daemon_config = get_daemon_config()
     if not daemon_config:
         await watch_repo()
         return
 
-    watch_paths = []
-    path_to_repo: dict[str, str] = {}
-    for repo in daemon_config.repos:
-        resolved = repo.path.resolve()
-        watch_paths.append(resolved)
-        path_to_repo[str(resolved)] = repo.name
-        logger.info(f"Starting watcher for repo '{repo.name}' at {resolved}")
-
     loop = asyncio.get_running_loop()
-    queue: asyncio.Queue[set[tuple[Change, str]]] = asyncio.Queue()
-
-    def _run_sync_watcher() -> None:
-        logger.info("Initializing file watchers for %d repos...", len(watch_paths))
-        t0 = time.monotonic()
-        first = True
-        for changes in watch(*watch_paths, watch_filter=_GitAwareFilter()):
-            if first:
-                logger.info(
-                    "[startup] file watchers ready (%.0fms)", (time.monotonic() - t0) * 1000
-                )
-                first = False
-            loop.call_soon_threadsafe(queue.put_nowait, changes)
-
-    thread = threading.Thread(target=_run_sync_watcher, daemon=True)
-    thread.start()
-
     pending: dict[str, set[str]] = {}  # repo_name -> paths
-    quiet_task: asyncio.Task[None] | None = None
     batch_start: float | None = None
 
     async def flush() -> None:
@@ -219,35 +207,81 @@ async def watch_multi_repo():
             await _coalesce_and_broadcast(paths, repo_name)
 
     while True:
-        changes = await queue.get()
-        for _change, abs_path in changes:
-            abs_path_obj = Path(abs_path)
-            for repo_path_str, name in path_to_repo.items():
-                repo_path = Path(repo_path_str)
-                try:
-                    rel_path = str(abs_path_obj.relative_to(repo_path))
-                except ValueError:
-                    continue
-                if _is_relevant(rel_path):
-                    pending.setdefault(name, set()).add(rel_path)
+        _watcher_stop_event.clear()
+
+        watch_paths = []
+        path_to_repo: dict[str, str] = {}
+        for repo in daemon_config.repos:
+            resolved = repo.path.resolve()
+            watch_paths.append(resolved)
+            path_to_repo[str(resolved)] = repo.name
+
+        logger.info("Starting file watchers for %d repos", len(watch_paths))
+
+        queue: asyncio.Queue[set[tuple[Change, str]] | None] = asyncio.Queue()
+
+        def _start_watcher(paths: list[Path], q: asyncio.Queue) -> None:
+            logger.info("Initializing file watchers for %d repos...", len(paths))
+            t0 = time.monotonic()
+            first = True
+            for changes in watch(
+                *paths,
+                watch_filter=_GitAwareFilter(),
+                stop_event=_watcher_stop_event,
+            ):
+                if first:
+                    logger.info(
+                        "[startup] file watchers ready (%.0fms)", (time.monotonic() - t0) * 1000
+                    )
+                    first = False
+                loop.call_soon_threadsafe(q.put_nowait, changes)
+            # Signal the async side that the watcher exited
+            loop.call_soon_threadsafe(q.put_nowait, None)
+
+        thread = threading.Thread(target=_start_watcher, args=(watch_paths, queue), daemon=True)
+        thread.start()
+
+        quiet_task: asyncio.Task[None] | None = None
+        restarting = False
+        while True:
+            changes = await queue.get()
+            if changes is None:
+                # Watcher was stopped — restart with updated repo list
+                logger.info("File watcher stopped, restarting with updated repo list")
+                restarting = True
                 break
 
-        if not pending:
-            continue
+            for _change, abs_path in changes:
+                abs_path_obj = Path(abs_path)
+                for repo_path_str, name in path_to_repo.items():
+                    repo_path = Path(repo_path_str)
+                    try:
+                        rel_path = str(abs_path_obj.relative_to(repo_path))
+                    except ValueError:
+                        continue
+                    if _is_relevant(rel_path):
+                        pending.setdefault(name, set()).add(rel_path)
+                    break
 
-        now = asyncio.get_event_loop().time()
-        if batch_start is None:
-            batch_start = now
+            if not pending:
+                continue
 
-        if quiet_task and not quiet_task.done():
-            quiet_task.cancel()
+            now = asyncio.get_event_loop().time()
+            if batch_start is None:
+                batch_start = now
 
-        if now - batch_start >= _MAX_WAIT_S:
-            await flush()
-        else:
+            if quiet_task and not quiet_task.done():
+                quiet_task.cancel()
 
-            async def _delayed_flush() -> None:
-                await asyncio.sleep(_QUIET_PERIOD_S)
+            if now - batch_start >= _MAX_WAIT_S:
                 await flush()
+            else:
 
-            quiet_task = asyncio.create_task(_delayed_flush())
+                async def _delayed_flush() -> None:
+                    await asyncio.sleep(_QUIET_PERIOD_S)
+                    await flush()
+
+                quiet_task = asyncio.create_task(_delayed_flush())
+
+        if not restarting:
+            break
