@@ -9,7 +9,7 @@ Vantage is a local Markdown viewer that renders your files the way GitHub does â
 Vantage is installed from source using [uv](https://docs.astral.sh/uv/) and [just](https://just.systems/).
 
 ```bash
-git clone https://github.com/mschulkind/vantage.git
+git clone https://github.com/mschulkind-oss/vantage.git
 cd vantage
 just install
 ```

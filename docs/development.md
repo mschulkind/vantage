@@ -33,7 +33,7 @@ docs/                 Documentation
 ## Setup
 
 ```bash
-git clone https://github.com/mschulkind/vantage.git
+git clone https://github.com/mschulkind-oss/vantage.git
 cd vantage
 just setup    # Installs Python and Node dependencies
 ```

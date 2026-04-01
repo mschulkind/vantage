@@ -1,10 +1,10 @@
 # Vantage 🔭
 
-[![CI](https://github.com/mschulkind/vantage/actions/workflows/ci.yml/badge.svg)](https://github.com/mschulkind/vantage/actions/workflows/ci.yml)
+[![CI](https://github.com/mschulkind-oss/vantage/actions/workflows/ci.yml/badge.svg)](https://github.com/mschulkind-oss/vantage/actions/workflows/ci.yml)
 
 **A beautiful local Markdown viewer with live reload and Git awareness.**
 
-[Website](https://vantageapp.dev) · [GitHub](https://github.com/mschulkind/vantage) · [Issues](https://github.com/mschulkind/vantage/issues)
+[Website](https://vantageapp.dev) · [GitHub](https://github.com/mschulkind-oss/vantage) · [Issues](https://github.com/mschulkind-oss/vantage/issues)
 
 ![Vantage screenshot](docs/screenshot.png)
 
@@ -40,7 +40,7 @@ Vantage requires **Python 3.13+** and is installed as a CLI tool using [uv](http
 
 ```bash
 # Install from source
-git clone https://github.com/mschulkind/vantage.git
+git clone https://github.com/mschulkind-oss/vantage.git
 cd vantage
 
 # Build and install (includes the frontend)

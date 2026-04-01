@@ -294,7 +294,6 @@ export const ViewerPage: React.FC = () => {
     }
   }, [currentPath, fetchStatus]);
 
-
   // Scroll to top when navigating to a new file, or to anchor if hash is present.
   // When the *same* file updates (live reload), preserve scroll position.
   useEffect(() => {
