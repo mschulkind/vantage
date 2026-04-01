@@ -31,6 +31,7 @@ import {
   Github,
   ArrowDownAZ,
   FolderGit2,
+  PanelLeftClose,
 } from "lucide-react";
 import { RelativeTime } from "../components/RelativeTime";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -122,6 +123,13 @@ export const ViewerPage: React.FC = () => {
   const [allFiles, setAllFiles] = useState<string[]>([]);
   const [globalFiles, setGlobalFiles] = useState<GlobalFile[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("vantage:sidebarCollapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [showRaw, setShowRaw] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pathCopied, setPathCopied] = useState(false);
@@ -428,7 +436,20 @@ export const ViewerPage: React.FC = () => {
     [navigate],
   );
   const handleToggleSidebar = useCallback(() => {
-    setSidebarOpen((prev) => !prev);
+    // On mobile, toggle the slide-out panel; on desktop, collapse the sidebar
+    if (window.innerWidth < 768) {
+      setSidebarOpen((prev) => !prev);
+    } else {
+      setSidebarCollapsed((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem("vantage:sidebarCollapsed", String(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    }
   }, []);
   const handleShortcutNavigate = useCallback(
     (path: string) => {
@@ -576,13 +597,16 @@ export const ViewerPage: React.FC = () => {
         />
       )}
 
-      {/* Sidebar - hidden on repo picker page */}
+      {/* Sidebar - hidden on repo picker page, collapsible on desktop */}
       {showSidebar && (
         <div
           className={cn(
             "w-72 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-800 shadow-sm",
-            "fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-auto",
+            "fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out md:relative md:z-auto",
             sidebarOpen ? "translate-x-0" : "-translate-x-full",
+            sidebarCollapsed
+              ? "md:-translate-x-full md:absolute"
+              : "md:translate-x-0",
           )}
         >
           <div className="h-14 px-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
@@ -622,6 +646,21 @@ export const ViewerPage: React.FC = () => {
                 onKeyboardShortcutsEnabledChange={setKeyboardShortcutsEnabled}
                 onOpenWhatsNew={whatsNew.open}
               />
+              <button
+                className="hidden md:block p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                onClick={() => {
+                  setSidebarCollapsed(true);
+                  try {
+                    localStorage.setItem("vantage:sidebarCollapsed", "true");
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar (b)"
+              >
+                <PanelLeftClose size={16} />
+              </button>
               <button
                 className="md:hidden p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"
                 onClick={() => setSidebarOpen(false)}
@@ -740,8 +779,22 @@ export const ViewerPage: React.FC = () => {
           <div className="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center px-3 md:px-6 justify-between shrink-0 bg-white dark:bg-slate-800 gap-2">
             <div className="flex items-center min-w-0 gap-2">
               <button
-                className="md:hidden p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0"
-                onClick={() => setSidebarOpen(true)}
+                className={cn(
+                  "p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0",
+                  sidebarCollapsed ? "" : "md:hidden",
+                )}
+                onClick={() => {
+                  if (window.innerWidth < 768) {
+                    setSidebarOpen(true);
+                  } else {
+                    setSidebarCollapsed(false);
+                    try {
+                      localStorage.setItem("vantage:sidebarCollapsed", "false");
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                }}
                 aria-label="Open sidebar"
               >
                 <Menu size={20} />
