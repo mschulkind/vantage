@@ -45,6 +45,10 @@ import {
 } from "../components/KeyboardShortcuts";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { RecentsModal } from "../components/RecentsModal";
+import { useReviewStore } from "../stores/useReviewStore";
+import { ReviewPanel } from "../components/ReviewPanel";
+import { ReviewToolbar } from "../components/ReviewToolbar";
+import { MessageSquarePlus, ClipboardCopy } from "lucide-react";
 
 /** Format an ISO date string as a short local datetime (e.g. "Mar 2, 2026 3:45 PM"). */
 function formatDateTime(dateStr: string): string {
@@ -151,6 +155,38 @@ export const ViewerPage: React.FC = () => {
   }, [latestCommit, currentPath, recentFiles]);
 
   useWebSocket();
+
+  // --- Review mode ---
+  const isReviewMode = useReviewStore((s) => s.isReviewMode);
+  const toggleReviewMode = useReviewStore((s) => s.toggleReviewMode);
+  const loadReview = useReviewStore((s) => s.loadReview);
+  const reviewAddSnapshot = useReviewStore((s) => s.addSnapshot);
+  const reviewSetLastContent = useReviewStore((s) => s.setLastContent);
+  const reviewLastContent = useReviewStore((s) => s.lastContent);
+  const reviewComments = useReviewStore((s) => s.comments);
+  const activeReviewCount = reviewComments.filter((c) => !c.resolved).length;
+  const copyAllReviewComments = useReviewStore((s) => s.copyAllToClipboard);
+  const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
+  const [reviewCopied, setReviewCopied] = useState(false);
+
+  // Load review data when file changes
+  useEffect(() => {
+    if (currentPath && currentPath.toLowerCase().endsWith(".md")) {
+      loadReview(currentPath).catch(() => {});
+    }
+  }, [currentPath, loadReview]);
+
+  // Track content for auto-snapshot: when content changes and review mode is on,
+  // snapshot the previous version
+  useEffect(() => {
+    if (!fileContent || !isReviewMode) return;
+    const content = fileContent.content;
+    if (reviewLastContent && reviewLastContent !== content) {
+      // Content changed while in review mode — snapshot the old version
+      reviewAddSnapshot(reviewLastContent);
+    }
+    reviewSetLastContent(content);
+  }, [fileContent?.content, isReviewMode]);
 
   const whatsNew = useWhatsNew();
 
@@ -958,6 +994,68 @@ export const ViewerPage: React.FC = () => {
                     </span>
                   </button>
                 )}
+                {currentPath &&
+                  currentPath.toLowerCase().endsWith(".md") &&
+                  !showRaw && (
+                    <>
+                      <button
+                        onClick={toggleReviewMode}
+                        className={cn(
+                          "flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 transition-colors cursor-pointer",
+                          isReviewMode
+                            ? "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-300 dark:ring-purple-700"
+                            : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                        )}
+                        title={
+                          isReviewMode
+                            ? "Exit review mode"
+                            : "Enter review mode"
+                        }
+                      >
+                        <MessageSquarePlus size={14} />
+                        <span className="hidden sm:inline">Review</span>
+                      </button>
+                      {isReviewMode && (
+                        <>
+                          <ReviewToolbar />
+                          {activeReviewCount > 0 && (
+                            <button
+                              onClick={async () => {
+                                const ok = await copyAllReviewComments();
+                                if (ok) {
+                                  setReviewCopied(true);
+                                  setTimeout(
+                                    () => setReviewCopied(false),
+                                    2000,
+                                  );
+                                }
+                              }}
+                              className="flex items-center space-x-1.5 text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-lg px-2 py-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors cursor-pointer"
+                              title="Copy all comments to clipboard"
+                            >
+                              {reviewCopied ? (
+                                <Check size={14} />
+                              ) : (
+                                <ClipboardCopy size={14} />
+                              )}
+                              <span className="hidden sm:inline">
+                                {reviewCopied
+                                  ? "Copied!"
+                                  : `Copy ${activeReviewCount}`}
+                              </span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setReviewPanelOpen(true)}
+                            className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors cursor-pointer"
+                            title="Manage comments"
+                          >
+                            <MessageSquare size={14} />
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
               </div>
             ) : currentPath && currentPath.toLowerCase().endsWith(".md") ? (
               <div className="flex items-center space-x-2 shrink-0">
@@ -1024,16 +1122,80 @@ export const ViewerPage: React.FC = () => {
                     {showRaw ? "Rendered" : "Raw"}
                   </span>
                 </button>
+                {!showRaw && (
+                  <>
+                    <button
+                      onClick={toggleReviewMode}
+                      className={cn(
+                        "flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 transition-colors cursor-pointer",
+                        isReviewMode
+                          ? "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-300 dark:ring-purple-700"
+                          : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                      )}
+                      title={
+                        isReviewMode ? "Exit review mode" : "Enter review mode"
+                      }
+                    >
+                      <MessageSquarePlus size={14} />
+                      <span className="hidden sm:inline">Review</span>
+                    </button>
+                    {isReviewMode && (
+                      <>
+                        <ReviewToolbar />
+                        {activeReviewCount > 0 && (
+                          <button
+                            onClick={async () => {
+                              const ok = await copyAllReviewComments();
+                              if (ok) {
+                                setReviewCopied(true);
+                                setTimeout(() => setReviewCopied(false), 2000);
+                              }
+                            }}
+                            className="flex items-center space-x-1.5 text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-lg px-2 py-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors cursor-pointer"
+                            title="Copy all comments to clipboard"
+                          >
+                            {reviewCopied ? (
+                              <Check size={14} />
+                            ) : (
+                              <ClipboardCopy size={14} />
+                            )}
+                            <span className="hidden sm:inline">
+                              {reviewCopied
+                                ? "Copied!"
+                                : `Copy ${activeReviewCount}`}
+                            </span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setReviewPanelOpen(true)}
+                          className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition-colors cursor-pointer"
+                          title="Manage comments"
+                        >
+                          <MessageSquare size={14} />
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             ) : null}
           </div>
         ) : null}
 
+        {/* Review mode indicator bar */}
+        {isReviewMode && (
+          <div className="h-1 bg-gradient-to-r from-purple-500 via-purple-400 to-purple-500 shrink-0" />
+        )}
+
         {/* Viewer */}
         <div
           ref={contentRef}
           data-content-scroll
-          className="flex-1 overflow-y-auto bg-white dark:bg-slate-900"
+          className={cn(
+            "flex-1 overflow-y-auto bg-white dark:bg-slate-900",
+            isReviewMode &&
+              "ring-1 ring-inset ring-purple-200 dark:ring-purple-800/50",
+          )}
         >
           <div className="max-w-5xl mx-auto py-4 px-4 sm:py-6 sm:px-8">
             {error ? (
@@ -1094,6 +1256,7 @@ export const ViewerPage: React.FC = () => {
                     <MarkdownViewer
                       content={fileContent.content}
                       currentPath={fileContent.path}
+                      isReviewMode={isReviewMode}
                     />
                   )}
                 </div>
@@ -1260,6 +1423,11 @@ export const ViewerPage: React.FC = () => {
       />
       {/* What's New Modal */}
       <WhatsNewModal isOpen={whatsNew.isOpen} onClose={whatsNew.close} />
+      {/* Review Panel */}
+      <ReviewPanel
+        isOpen={reviewPanelOpen}
+        onClose={() => setReviewPanelOpen(false)}
+      />
     </div>
   );
 };

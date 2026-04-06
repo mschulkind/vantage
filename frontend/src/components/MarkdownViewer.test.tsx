@@ -149,7 +149,8 @@ This is the body.`;
     expect(screen.getByText("author")).toBeInTheDocument();
     expect(screen.getByText("John Doe")).toBeInTheDocument();
     expect(screen.getByText("tags")).toBeInTheDocument();
-    expect(screen.getByText("react, testing")).toBeInTheDocument();
+    expect(screen.getByText("react")).toBeInTheDocument();
+    expect(screen.getByText("testing")).toBeInTheDocument();
 
     // Check body content is still rendered
     expect(screen.getByText("Content")).toBeInTheDocument();

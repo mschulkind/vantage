@@ -551,6 +551,8 @@ class GitService:
         # Collect .md files from top level and non-git subdirectories.
         try:
             for entry in os.scandir(self.repo_path):
+                if entry.is_symlink():
+                    continue  # Skip symlinks in recents
                 if entry.is_file(follow_symlinks=True) and _matches_ext(entry.name):
                     try:
                         st = entry.stat()
@@ -582,6 +584,8 @@ class GitService:
                             if not _matches_ext(fname):
                                 continue
                             full = Path(dirpath) / fname
+                            if full.is_symlink():
+                                continue  # Skip symlinks in recents
                             try:
                                 rel = str(full.relative_to(self.repo_path))
                                 st = full.stat()
@@ -783,6 +787,9 @@ class GitService:
                 st = full.stat()
                 if not stat_module.S_ISREG(st.st_mode):
                     continue
+                # Skip symlinks — they shouldn't appear in recents
+                if full.is_symlink():
+                    continue
                 walk_results.append(
                     {
                         "path": rel_path,
@@ -872,8 +879,12 @@ class GitService:
 
                 # Single stat() call: existence + file type + mtime
                 try:
-                    st = (self.repo_path / rel_path).stat()
+                    entry_path = self.repo_path / rel_path
+                    st = entry_path.stat()
                     if not stat_module.S_ISREG(st.st_mode):
+                        continue
+                    # Skip symlinks — they shouldn't appear in recents
+                    if entry_path.is_symlink():
                         continue
                     effective_date = datetime.fromtimestamp(st.st_mtime, tz=UTC)
                 except OSError:

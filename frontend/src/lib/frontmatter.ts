@@ -1,43 +1,55 @@
 /**
- * Simple browser-compatible frontmatter parser.
- * Parses YAML frontmatter from markdown content.
+ * Browser-compatible frontmatter parser.
+ * Parses YAML (---) and TOML (+++) frontmatter from markdown content.
  */
 
 import YAML from "yaml";
+import { parse as parseTOML } from "smol-toml";
+
+export type FrontmatterFormat = "yaml" | "toml" | "none";
 
 interface ParsedContent {
   frontmatter: Record<string, unknown>;
   body: string;
+  format: FrontmatterFormat;
 }
 
 /**
  * Parse frontmatter from markdown content.
- * Frontmatter must be delimited by --- at the start and end.
+ * Supports YAML (delimited by ---) and TOML (delimited by +++).
  */
 export function parseFrontmatter(content: string): ParsedContent {
-  // Check if content starts with frontmatter delimiter
-  if (!content.startsWith("---")) {
-    return { frontmatter: {}, body: content };
+  if (content.startsWith("+++")) {
+    return parseFrontmatterWithDelimiter(content, "+++", "toml");
   }
+  if (content.startsWith("---")) {
+    return parseFrontmatterWithDelimiter(content, "---", "yaml");
+  }
+  return { frontmatter: {}, body: content, format: "none" };
+}
 
-  // Find the closing delimiter
-  const endIndex = content.indexOf("\n---", 3);
+function parseFrontmatterWithDelimiter(
+  content: string,
+  delimiter: string,
+  format: "yaml" | "toml",
+): ParsedContent {
+  const searchStart = delimiter.length;
+  const endIndex = content.indexOf(`\n${delimiter}`, searchStart);
   if (endIndex === -1) {
-    return { frontmatter: {}, body: content };
+    return { frontmatter: {}, body: content, format: "none" };
   }
 
-  // Extract frontmatter YAML
-  const yamlContent = content.slice(4, endIndex).trim();
-
-  // Extract body (skip the closing --- and any following newline)
-  const bodyStart = endIndex + 4;
+  const raw = content.slice(searchStart + 1, endIndex).trim();
+  const bodyStart = endIndex + 1 + delimiter.length;
   const body = content.slice(bodyStart).replace(/^\n/, "");
 
   try {
-    const frontmatter = YAML.parse(yamlContent) as Record<string, unknown>;
-    return { frontmatter: frontmatter || {}, body };
+    const frontmatter =
+      format === "toml"
+        ? (parseTOML(raw) as Record<string, unknown>)
+        : (YAML.parse(raw) as Record<string, unknown>);
+    return { frontmatter: frontmatter || {}, body, format };
   } catch {
-    // If YAML parsing fails, return original content
-    return { frontmatter: {}, body: content };
+    return { frontmatter: {}, body: content, format: "none" };
   }
 }

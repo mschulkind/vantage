@@ -33,7 +33,7 @@ describe("FrontmatterDisplay", () => {
     expect(screen.getByText("2024-01-15")).toBeInTheDocument();
   });
 
-  it("renders array values as comma-separated list", () => {
+  it("renders string arrays as tag pills", () => {
     render(
       <FrontmatterDisplay
         frontmatter={{ tags: ["react", "typescript", "testing"] }}
@@ -41,7 +41,9 @@ describe("FrontmatterDisplay", () => {
     );
 
     expect(screen.getByText("tags")).toBeInTheDocument();
-    expect(screen.getByText("react, typescript, testing")).toBeInTheDocument();
+    expect(screen.getByText("react")).toBeInTheDocument();
+    expect(screen.getByText("typescript")).toBeInTheDocument();
+    expect(screen.getByText("testing")).toBeInTheDocument();
   });
 
   it("renders nested objects as JSON", () => {
@@ -54,7 +56,6 @@ describe("FrontmatterDisplay", () => {
     );
 
     expect(screen.getByText("meta")).toBeInTheDocument();
-    // The nested object should be rendered somehow
     expect(screen.getByText(/description/)).toBeInTheDocument();
   });
 
@@ -76,5 +77,47 @@ describe("FrontmatterDisplay", () => {
     expect(screen.getByText("42")).toBeInTheDocument();
     expect(screen.getByText("version")).toBeInTheDocument();
     expect(screen.getByText("1.5")).toBeInTheDocument();
+  });
+
+  it("flattens Zola taxonomies into top-level rows", () => {
+    render(
+      <FrontmatterDisplay
+        frontmatter={{
+          title: "My Post",
+          taxonomies: {
+            tags: ["rust", "zola"],
+            categories: ["tutorial"],
+          },
+        }}
+      />,
+    );
+
+    // taxonomies key should not appear; its children should be top-level
+    expect(screen.queryByText("taxonomies")).not.toBeInTheDocument();
+    expect(screen.getByText("tags")).toBeInTheDocument();
+    expect(screen.getByText("rust")).toBeInTheDocument();
+    expect(screen.getByText("zola")).toBeInTheDocument();
+    expect(screen.getByText("categories")).toBeInTheDocument();
+    expect(screen.getByText("tutorial")).toBeInTheDocument();
+  });
+
+  it("flattens Zola extra section into top-level rows", () => {
+    render(
+      <FrontmatterDisplay
+        frontmatter={{
+          title: "Post",
+          extra: {
+            author: "Jane",
+            series: "Getting Started",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("extra")).not.toBeInTheDocument();
+    expect(screen.getByText("author")).toBeInTheDocument();
+    expect(screen.getByText("Jane")).toBeInTheDocument();
+    expect(screen.getByText("series")).toBeInTheDocument();
+    expect(screen.getByText("Getting Started")).toBeInTheDocument();
   });
 });

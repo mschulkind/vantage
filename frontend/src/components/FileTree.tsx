@@ -1,5 +1,12 @@
 import React, { memo, useCallback } from "react";
-import { Folder, File, ChevronRight, ChevronDown } from "lucide-react";
+import {
+  Folder,
+  File,
+  ChevronRight,
+  ChevronDown,
+  Link,
+  AlertTriangle,
+} from "lucide-react";
 import { FileNode } from "../types";
 import { useRepoStore } from "../stores/useRepoStore";
 import { cn } from "../lib/utils";
@@ -119,55 +126,85 @@ const FileTreeNodeInner: React.FC<FileTreeNodeProps> = ({ node }) => {
     gitStatus === "added" ||
     gitStatus === "untracked";
   const dirHasChanges = gitStatus === "contains_changes";
+  const isSymlink = node.is_symlink === true;
+  const isSymlinkError = isSymlink && node.symlink_target == null;
 
   // Hide non-markdown directories when the toggle is off
   if (isDimmed && !showEmptyDirs) return null;
 
   // Determine file icon color based on git status
-  const fileIconColor = hasGitChange
-    ? gitStatus === "untracked"
-      ? "text-green-500"
-      : "text-amber-500"
-    : "text-slate-400";
-  const folderIconColor = isDimmed
-    ? "text-slate-300"
-    : dirHasChanges
-      ? "text-amber-400"
-      : isExpanded
-        ? "text-blue-500"
-        : "text-blue-400";
-  const nameColor = isDimmed
-    ? "text-slate-400 dark:text-slate-600"
-    : hasGitChange
-      ? gitStatus === "untracked"
-        ? "text-green-700 dark:text-green-400"
-        : "text-amber-700 dark:text-amber-400"
-      : dirHasChanges
-        ? "text-amber-700 dark:text-amber-400"
-        : "text-slate-700 dark:text-slate-300";
+  const fileIconColor = isSymlinkError
+    ? "text-red-400"
+    : isSymlink
+      ? "text-slate-400"
+      : hasGitChange
+        ? gitStatus === "untracked"
+          ? "text-green-500"
+          : "text-amber-500"
+        : "text-slate-400";
+  const folderIconColor = isSymlinkError
+    ? "text-red-400"
+    : isSymlink
+      ? "text-slate-400"
+      : isDimmed
+        ? "text-slate-300"
+        : dirHasChanges
+          ? "text-amber-400"
+          : isExpanded
+            ? "text-blue-500"
+            : "text-blue-400";
+  const nameColor = isSymlinkError
+    ? "text-red-400 dark:text-red-500 line-through"
+    : isSymlink
+      ? "text-slate-400 dark:text-slate-500 italic"
+      : isDimmed
+        ? "text-slate-400 dark:text-slate-600"
+        : hasGitChange
+          ? gitStatus === "untracked"
+            ? "text-green-700 dark:text-green-400"
+            : "text-amber-700 dark:text-amber-400"
+          : dirHasChanges
+            ? "text-amber-700 dark:text-amber-400"
+            : "text-slate-700 dark:text-slate-300";
 
   return (
     <div>
       <a
-        href={nodeHref}
+        href={isSymlinkError ? undefined : nodeHref}
         className={cn(
           "flex items-center py-1.5 px-2 cursor-pointer rounded-md text-sm transition-all duration-150",
           "hover:bg-slate-100 dark:hover:bg-slate-700 no-underline",
           isActive &&
+            !isSymlinkError &&
             "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium",
           isDimmed && "opacity-40",
           isRecentlyChanged && "animate-flash-update",
+          isSymlinkError && "cursor-not-allowed opacity-60",
         )}
-        onClick={handleClick}
+        onClick={
+          isSymlinkError
+            ? (e: React.MouseEvent) => e.preventDefault()
+            : handleClick
+        }
+        title={
+          isSymlinkError
+            ? "Symlink target is outside this project or broken"
+            : isSymlink
+              ? `Symlink → ${node.symlink_target}`
+              : undefined
+        }
       >
         {/* Arrow toggle — large click target with visible hover feedback */}
         <span
           className={cn(
             "mr-1 p-1 -ml-1 rounded transition-colors",
             node.is_dir &&
+              !isSymlinkError &&
               "cursor-pointer hover:bg-slate-200 active:bg-slate-300",
           )}
-          onClick={node.is_dir ? handleToggleExpand : undefined}
+          onClick={
+            node.is_dir && !isSymlinkError ? handleToggleExpand : undefined
+          }
         >
           {node.is_dir ? (
             isExpanded ? (
@@ -179,7 +216,7 @@ const FileTreeNodeInner: React.FC<FileTreeNodeProps> = ({ node }) => {
             <span className="w-3.5 block" />
           )}
         </span>
-        <span className="mr-2">
+        <span className="mr-2 relative">
           {node.is_dir ? (
             <Folder
               size={15}
@@ -188,11 +225,25 @@ const FileTreeNodeInner: React.FC<FileTreeNodeProps> = ({ node }) => {
           ) : (
             <File size={15} className={fileIconColor} />
           )}
+          {isSymlink && (
+            <span className="absolute -bottom-0.5 -right-1">
+              {isSymlinkError ? (
+                <AlertTriangle size={8} className="text-red-500" />
+              ) : (
+                <Link size={7} className="text-slate-400" />
+              )}
+            </span>
+          )}
         </span>
-        <span className={cn("truncate", isActive ? undefined : nameColor)}>
+        <span
+          className={cn(
+            "truncate",
+            isActive && !isSymlinkError ? undefined : nameColor,
+          )}
+        >
           {node.name}
         </span>
-        {hasGitChange && (
+        {hasGitChange && !isSymlink && (
           <span
             className={cn(
               "ml-auto shrink-0 w-1.5 h-1.5 rounded-full",
@@ -229,6 +280,8 @@ const FileTreeNode = memo(FileTreeNodeInner, (prevProps, nextProps) => {
       prevProps.node.is_dir === nextProps.node.is_dir &&
       prevProps.node.has_markdown === nextProps.node.has_markdown &&
       prevProps.node.git_status === nextProps.node.git_status &&
+      prevProps.node.is_symlink === nextProps.node.is_symlink &&
+      prevProps.node.symlink_target === nextProps.node.symlink_target &&
       prevProps.node.children === nextProps.node.children)
   );
 });

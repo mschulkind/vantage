@@ -11,6 +11,8 @@ export interface FileNode {
   git_status?: string; // 'modified' | 'added' | 'deleted' | 'untracked' | 'contains_changes'
   last_commit?: GitCommit;
   children?: FileNode[];
+  is_symlink?: boolean;
+  symlink_target?: string | null; // relative path to target (null = broken/external)
 }
 
 export interface GitCommit {
@@ -94,4 +96,26 @@ export interface JJEvoEntry {
 export interface JJInfo {
   is_jj: boolean;
   working_copy_change_id: string | null;
+}
+
+// --- Review mode types ---
+
+export interface ReviewSnapshot {
+  id: string;
+  content: string;
+  timestamp: number;
+}
+
+export interface ReviewComment {
+  id: string;
+  selected_text: string;
+  comment: string;
+  created_at: number;
+  resolved?: boolean;
+}
+
+export interface ReviewData {
+  file_path: string;
+  snapshots: ReviewSnapshot[];
+  comments: ReviewComment[];
 }

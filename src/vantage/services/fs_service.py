@@ -155,6 +155,10 @@ class FileSystemService:
 
         By default returns just file/folder names (fast, no git calls).
         Set include_git=True to also fetch last_commit per entry (batch git call).
+
+        Symlinks are detected and annotated:
+        - Internal symlinks (target inside root_path) are shown with symlink_target set.
+        - External or broken symlinks are shown with is_symlink=True but symlink_target=None.
         """
         target_dir = self.validate_path(path)
         if not target_dir.is_dir():
@@ -166,7 +170,36 @@ class FileSystemService:
             self._get_gitignored_names(target_dir) if not self.show_gitignored else set()
         )
         for entry in os.scandir(target_dir):
-            is_dir = entry.is_dir()
+            is_symlink = entry.is_symlink()
+
+            # For broken symlinks, is_dir() and is_file() both return False.
+            # Detect this early and handle as an error entry.
+            if is_symlink:
+                try:
+                    entry.stat()  # follows symlink — raises if broken
+                except OSError:
+                    # Broken symlink — show as error if it looks like .md or a dir
+                    name = entry.name
+                    if not self.show_hidden and name.startswith("."):
+                        continue
+                    if not self.show_gitignored and name in gitignored_names:
+                        continue
+                    is_markdown_name = name.lower().endswith(".md")
+                    if is_markdown_name or not name.endswith((".",)):
+                        rel_path = os.path.relpath(entry.path, self.root_path)
+                        nodes.append(
+                            FileNode(
+                                name=name,
+                                path=rel_path,
+                                is_dir=not is_markdown_name,
+                                has_markdown=False,
+                                is_symlink=True,
+                                symlink_target=None,
+                            )
+                        )
+                    continue
+
+            is_dir = entry.is_dir()  # follows symlinks
             is_markdown = entry.name.lower().endswith(".md")
 
             # Skip excluded directories
@@ -179,7 +212,33 @@ class FileSystemService:
             if not self.show_gitignored and entry.name in gitignored_names:
                 continue
 
+            symlink_target: str | None = None
+            symlink_error = False
+            if is_symlink:
+                try:
+                    resolved = Path(entry.path).resolve()
+                    resolved.relative_to(self.root_path)
+                    symlink_target = str(resolved.relative_to(self.root_path))
+                except (ValueError, OSError):
+                    # Target is outside root_path or broken
+                    symlink_error = True
+
             if is_dir:
+                # Don't recurse into symlinked dirs pointing outside the project
+                if is_symlink and symlink_error:
+                    rel_path = os.path.relpath(entry.path, self.root_path)
+                    nodes.append(
+                        FileNode(
+                            name=entry.name,
+                            path=rel_path,
+                            is_dir=True,
+                            has_markdown=False,
+                            is_symlink=True,
+                            symlink_target=None,
+                        )
+                    )
+                    continue
+
                 has_md = self._dir_has_markdown(Path(entry.path))
                 rel_path = os.path.relpath(entry.path, self.root_path)
                 rel_paths.append(rel_path)
@@ -190,9 +249,26 @@ class FileSystemService:
                         is_dir=True,
                         has_markdown=has_md,
                         last_commit=None,
+                        is_symlink=is_symlink,
+                        symlink_target=symlink_target if is_symlink else None,
                     )
                 )
             elif is_markdown:
+                # Show broken/external symlink .md files as errors (not navigable)
+                if is_symlink and symlink_error:
+                    rel_path = os.path.relpath(entry.path, self.root_path)
+                    nodes.append(
+                        FileNode(
+                            name=entry.name,
+                            path=rel_path,
+                            is_dir=False,
+                            has_markdown=True,
+                            is_symlink=True,
+                            symlink_target=None,
+                        )
+                    )
+                    continue
+
                 rel_path = os.path.relpath(entry.path, self.root_path)
                 rel_paths.append(rel_path)
                 nodes.append(
@@ -202,6 +278,8 @@ class FileSystemService:
                         is_dir=False,
                         has_markdown=True,
                         last_commit=None,
+                        is_symlink=is_symlink,
+                        symlink_target=symlink_target if is_symlink else None,
                     )
                 )
 
@@ -233,12 +311,13 @@ class FileSystemService:
 
         Fast: pure filesystem walk, no git calls.
         Skips excluded directories (node_modules, .venv, etc.).
+        Skips symlinks to avoid duplicates and external references.
         """
         if extensions is None:
             extensions = [".md"]
 
         results: list[str] = []
-        for dirpath, dirnames, filenames in os.walk(self.root_path):
+        for dirpath, dirnames, filenames in os.walk(self.root_path, followlinks=False):
             # Prune excluded directories and optionally hidden directories
             dirnames[:] = [
                 d
@@ -249,6 +328,8 @@ class FileSystemService:
                 if extensions and not any(fname.lower().endswith(ext) for ext in extensions):
                     continue
                 full = os.path.join(dirpath, fname)
+                if os.path.islink(full):
+                    continue
                 rel = os.path.relpath(full, self.root_path)
                 results.append(rel)
 

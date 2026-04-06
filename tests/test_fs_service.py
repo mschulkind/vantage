@@ -125,3 +125,103 @@ def test_list_directory_hidden_markdown(tmp_path):
     # .no_md_dir has no markdown — still listed but flagged
     assert ".no_md_dir" in by_name
     assert by_name[".no_md_dir"].has_markdown is False
+
+
+# --- Symlink tests ---
+
+
+def test_list_directory_internal_file_symlink(tmp_path):
+    """Symlinks to files inside the project are shown with is_symlink and target."""
+    (tmp_path / "real.md").write_text("real content")
+    (tmp_path / "link.md").symlink_to(tmp_path / "real.md")
+
+    fs = FileSystemService(tmp_path)
+    nodes = fs.list_directory(".")
+    by_name = {n.name: n for n in nodes}
+
+    assert "real.md" in by_name
+    assert by_name["real.md"].is_symlink is False
+
+    assert "link.md" in by_name
+    assert by_name["link.md"].is_symlink is True
+    assert by_name["link.md"].symlink_target == "real.md"
+
+
+def test_list_directory_internal_dir_symlink(tmp_path):
+    """Symlinks to directories inside the project are shown with is_symlink and target."""
+    (tmp_path / "real_dir").mkdir()
+    (tmp_path / "real_dir" / "doc.md").write_text("hello")
+    (tmp_path / "link_dir").symlink_to(tmp_path / "real_dir")
+
+    fs = FileSystemService(tmp_path)
+    nodes = fs.list_directory(".")
+    by_name = {n.name: n for n in nodes}
+
+    assert "real_dir" in by_name
+    assert by_name["real_dir"].is_symlink is False
+
+    assert "link_dir" in by_name
+    assert by_name["link_dir"].is_symlink is True
+    assert by_name["link_dir"].symlink_target == "real_dir"
+    assert by_name["link_dir"].is_dir is True
+
+
+def test_list_directory_external_symlink_file(tmp_path):
+    """Symlinks to files outside the project are shown as errors."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "secret.md").write_text("secret")
+    (repo / "link.md").symlink_to(external / "secret.md")
+
+    fs = FileSystemService(repo)
+    nodes = fs.list_directory(".")
+    by_name = {n.name: n for n in nodes}
+
+    assert "link.md" in by_name
+    assert by_name["link.md"].is_symlink is True
+    assert by_name["link.md"].symlink_target is None  # error state
+
+
+def test_list_directory_external_symlink_dir(tmp_path):
+    """Symlinks to directories outside the project are shown as errors."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    external = tmp_path / "external"
+    external.mkdir()
+    (repo / "link_dir").symlink_to(external)
+
+    fs = FileSystemService(repo)
+    nodes = fs.list_directory(".")
+    by_name = {n.name: n for n in nodes}
+
+    assert "link_dir" in by_name
+    assert by_name["link_dir"].is_symlink is True
+    assert by_name["link_dir"].symlink_target is None
+    assert by_name["link_dir"].has_markdown is False
+
+
+def test_list_directory_broken_symlink(tmp_path):
+    """Broken symlinks are shown as errors."""
+    (tmp_path / "broken.md").symlink_to(tmp_path / "nonexistent.md")
+
+    fs = FileSystemService(tmp_path)
+    nodes = fs.list_directory(".")
+    by_name = {n.name: n for n in nodes}
+
+    assert "broken.md" in by_name
+    assert by_name["broken.md"].is_symlink is True
+    assert by_name["broken.md"].symlink_target is None
+
+
+def test_list_all_files_skips_symlinks(tmp_path):
+    """list_all_files should not return symlinked files."""
+    (tmp_path / "real.md").write_text("real content")
+    (tmp_path / "link.md").symlink_to(tmp_path / "real.md")
+
+    fs = FileSystemService(tmp_path)
+    files = fs.list_all_files()
+
+    assert "real.md" in files
+    assert "link.md" not in files

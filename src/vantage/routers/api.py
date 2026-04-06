@@ -15,6 +15,7 @@ from vantage.schemas.models import (
     JJInfo,
     JJRevision,
     RepoInfo,
+    ReviewData,
     VersionInfo,
 )
 from vantage.services.fs_service import FileSystemService
@@ -650,6 +651,59 @@ async def get_perf_diagnostics(include_shape: bool = False):
         result["repo_shape"] = repo_shapes
 
     return result
+
+
+# --- Review mode endpoints ---
+
+
+@router.get("/r/{repo}/review", response_model=ReviewData | None)
+async def get_review_multi(repo: str, path: str):
+    from vantage.services.review_service import get_review
+
+    return get_review(path, repo=repo)
+
+
+@router.put("/r/{repo}/review")
+async def save_review_multi(repo: str, path: str, data: ReviewData):
+    from vantage.services.review_service import save_review
+
+    save_review(path, data, repo=repo)
+    return {"status": "ok"}
+
+
+@router.delete("/r/{repo}/review")
+async def delete_review_multi(repo: str, path: str):
+    from vantage.services.review_service import delete_review
+
+    deleted = delete_review(path, repo=repo)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="No review found")
+    return {"status": "ok"}
+
+
+@router.get("/review", response_model=ReviewData | None)
+async def get_review_single(path: str):
+    from vantage.services.review_service import get_review
+
+    return get_review(path)
+
+
+@router.put("/review")
+async def save_review_single(path: str, data: ReviewData):
+    from vantage.services.review_service import save_review
+
+    save_review(path, data)
+    return {"status": "ok"}
+
+
+@router.delete("/review")
+async def delete_review_single(path: str):
+    from vantage.services.review_service import delete_review
+
+    deleted = delete_review(path)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="No review found")
+    return {"status": "ok"}
 
 
 @router.post("/perf/reset")

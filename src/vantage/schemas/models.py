@@ -19,6 +19,8 @@ class FileNode(BaseModel):
     git_status: str | None = None  # 'modified', 'added', 'deleted', 'untracked', 'contains_changes'
     last_commit: Optional["GitCommit"] = None
     children: list["FileNode"] | None = None
+    is_symlink: bool = False
+    symlink_target: str | None = None  # relative path to target (None = broken/external)
 
 
 class GitCommit(BaseModel):
@@ -97,3 +99,26 @@ class JJInfo(BaseModel):
 
     is_jj: bool
     working_copy_change_id: str | None = None
+
+
+# --- Review mode models ---
+
+
+class ReviewSnapshot(BaseModel):
+    id: str
+    content: str
+    timestamp: float  # epoch seconds
+
+
+class ReviewComment(BaseModel):
+    id: str
+    selected_text: str
+    comment: str
+    created_at: float  # epoch seconds
+    resolved: bool = False
+
+
+class ReviewData(BaseModel):
+    file_path: str
+    snapshots: list[ReviewSnapshot] = []
+    comments: list[ReviewComment] = []

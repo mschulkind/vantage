@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useRef } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -17,10 +17,14 @@ import { cn } from "../lib/utils";
 import { shouldHandleInternalNavigation } from "../lib/navigation";
 import { useRepoStore } from "../stores/useRepoStore";
 import { useDeltaFlash } from "../hooks/useDeltaFlash";
+import { useReviewHighlights } from "../hooks/useReviewHighlights";
+import { useReviewStore } from "../stores/useReviewStore";
+import { ReviewCommentPopover } from "./ReviewCommentPopover";
 
 interface MarkdownViewerProps {
   content: string;
   currentPath: string;
+  isReviewMode?: boolean;
 }
 
 // Sanitization schema: allows GFM, KaTeX, syntax highlighting, and heading anchors
@@ -73,6 +77,7 @@ const sanitizeSchema = {
 const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
   content,
   currentPath,
+  isReviewMode = false,
 }) => {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -207,6 +212,69 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
   // Delta flash: highlight only changed blocks on live updates
   useDeltaFlash(containerRef, content, currentPath);
 
+  // --- Review mode ---
+  const comments = useReviewStore((s) => s.comments);
+  const snapshots = useReviewStore((s) => s.snapshots);
+  const pendingSelection = useReviewStore((s) => s.pendingSelection);
+  const setPendingSelection = useReviewStore((s) => s.setPendingSelection);
+  const clearPendingSelection = useReviewStore((s) => s.clearPendingSelection);
+  const addComment = useReviewStore((s) => s.addComment);
+  const deleteComment = useReviewStore((s) => s.deleteComment);
+  const resolveComment = useReviewStore((s) => s.resolveComment);
+
+  const previousSnapshot =
+    snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
+
+  useReviewHighlights(
+    containerRef,
+    isReviewMode ? comments : [],
+    isReviewMode ? previousSnapshot : null,
+    isReviewMode ? body : null,
+    deleteComment,
+    resolveComment,
+  );
+
+  // Text selection handler for review mode.
+  // We listen on the document for mouseup so we catch selections that start
+  // inside the container and end outside.  A short delay lets the browser
+  // finalize the selection before we read it.
+  useEffect(() => {
+    if (!isReviewMode) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handler = () => {
+      // Small delay: the browser sometimes hasn't committed the selection
+      // at the instant mouseup fires (especially on fast clicks).
+      setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+          return; // plain click, not a drag-select
+        }
+
+        const text = selection.toString().trim();
+        if (!text || text.length < 3) return;
+
+        // Ensure selection is inside our container
+        const range = selection.getRangeAt(0);
+        if (
+          !el.contains(range.startContainer) &&
+          !el.contains(range.endContainer)
+        ) {
+          return;
+        }
+
+        const rect = range.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return; // collapsed rect
+
+        setPendingSelection(text, rect);
+      }, 10);
+    };
+
+    el.addEventListener("mouseup", handler);
+    return () => el.removeEventListener("mouseup", handler);
+  }, [isReviewMode, setPendingSelection]);
+
   // Memoize markdown components to prevent unnecessary re-renders
   const markdownComponents = useMemo(
     () => ({
@@ -310,6 +378,15 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
       >
         {body}
       </ReactMarkdown>
+      {/* Review mode: comment popover for new selections */}
+      {isReviewMode && pendingSelection && (
+        <ReviewCommentPopover
+          selectedText={pendingSelection.text}
+          rect={pendingSelection.rect}
+          onSave={(comment) => addComment(pendingSelection.text, comment)}
+          onCancel={clearPendingSelection}
+        />
+      )}
     </div>
   );
 };
@@ -320,7 +397,8 @@ export const MarkdownViewer = memo(
   (prevProps, nextProps) => {
     return (
       prevProps.content === nextProps.content &&
-      prevProps.currentPath === nextProps.currentPath
+      prevProps.currentPath === nextProps.currentPath &&
+      prevProps.isReviewMode === nextProps.isReviewMode
     );
   },
 );
