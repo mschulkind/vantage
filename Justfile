@@ -9,7 +9,7 @@ export OVERMIND_TITLE := "vantage-dev"
 default:
     @just --list
 
-# Setup the entire project
+# Setup the entire project (never modifies tracked files)
 setup:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -19,8 +19,8 @@ setup:
         rm -rf .venv
         uv venv --relocatable
     fi
-    uv sync
-    cd frontend && npm install
+    uv sync --frozen
+    cd frontend && npm ci
 
 # Run the backend server in development mode
 dev-py path=".":
@@ -130,8 +130,22 @@ build-frontend:
 bundle-frontend: build-frontend
     python3 -c "import shutil; from pathlib import Path; dst=Path('src/vantage/frontend_dist'); shutil.rmtree(dst, ignore_errors=True); shutil.copytree('frontend/dist', dst)"
 
+# Ensure venv + deps exist (idempotent, no-op if already set up)
+_ensure-env:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -d .venv ] || ! head -1 .venv/bin/pip 2>/dev/null | grep -q 'env python'; then
+        rm -rf .venv
+        uv venv --relocatable
+    fi
+    uv sync --frozen
+    if [ ! -d frontend/node_modules ]; then
+        cd frontend && npm ci
+    fi
+
 # Build the Python package (includes frontend)
-build: bundle-frontend
+# Never modifies tracked files — patches version in a temp copy of pyproject.toml.
+build: _ensure-env bundle-frontend
     #!/usr/bin/env bash
     set -euo pipefail
     rm -rf dist/
@@ -161,14 +175,19 @@ build: bundle-frontend
 
     echo "Building version: $build_version"
 
-    # Temporarily patch pyproject.toml version for the build
+    # Temporarily patch pyproject.toml for the build, with robust restore.
+    # Save original, patch in-place, build, then always restore from backup.
+    cp pyproject.toml pyproject.toml.bak
+    restore() { mv -f pyproject.toml.bak pyproject.toml; }
+    trap restore EXIT
     python3 -c "
     import re, pathlib
     p = pathlib.Path('pyproject.toml')
     p.write_text(re.sub(r'^version = \".*\"', 'version = \"${build_version}\"', p.read_text(), count=1, flags=re.M))
     "
-    trap 'git checkout pyproject.toml 2>/dev/null || true' EXIT
     uv build
+    restore
+    trap - EXIT
 
 # Install the built package as a uv tool
 install: build

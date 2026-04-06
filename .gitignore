@@ -14,6 +14,7 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+pyproject.toml.bak
 
 # Environment
 .env
