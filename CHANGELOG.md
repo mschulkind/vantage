@@ -5,6 +5,32 @@ All notable changes to Vantage will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-06
+
+### Added
+
+- **Review mode** — Toggle review mode on any markdown file to select text and leave inline comments. Comments are highlighted in the document and stored server-side for persistence across sessions.
+- **Outdated comment detection** — When the document changes and a comment's selected text no longer matches, it appears as an amber "Outdated" block near the changed section with a Dismiss button — similar to GitHub's outdated review comments.
+- **Auto-snapshots & revision history** — While in review mode, each file change automatically snapshots the previous version. Navigate revisions with `← Rev N of M →` controls.
+- **Block-level change highlights** — Changed paragraphs between revisions are marked with a purple left border for quick scanning.
+- **Copy all comments** — One-click export of all active review comments as markdown quotes, ready to paste back to an AI agent.
+- **TOML frontmatter support** — Zola-style `+++` TOML frontmatter is now parsed and displayed, with taxonomies and extra fields flattened into tag pills.
+- **Collapsible sidebar** — Click the collapse button to hide the file tree and maximize content area. State persists across sessions.
+- **Show hidden / gitignored files** — New filter toggles in the sidebar to reveal hidden files and gitignored files.
+- **Mermaid error handling** — Broken mermaid diagrams now show a friendly error message instead of crashing.
+- **`disable_whats_new` config** — Suppress the What's New popup entirely via server config.
+
+### Changed
+
+- **Startup performance** — Significantly faster initial load with background tree fetching, repo caching, and loading gate.
+- **Auto-discover repos** — `source_dirs` now recursively discovers git repos without explicit enumeration.
+
+### Fixed
+
+- Suppress What's New popup in static export mode.
+- Show directory index and README on root path in static mode.
+- Replace bundled GitHub SVG icon with inline SVG to avoid asset issues.
+
 ## [0.2.0] - 2026-03-25
 
 ### Added
