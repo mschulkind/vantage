@@ -49,6 +49,7 @@ import { useReviewStore } from "../stores/useReviewStore";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { ReviewToolbar } from "../components/ReviewToolbar";
 import { MessageSquarePlus, ClipboardCopy } from "lucide-react";
+import { useLineAnchor } from "../hooks/useLineAnchor";
 
 /** Format an ISO date string as a short local datetime (e.g. "Mar 2, 2026 3:45 PM"). */
 function formatDateTime(dateStr: string): string {
@@ -118,6 +119,7 @@ export const ViewerPage: React.FC = () => {
   const location = useLocation();
   const { "*": pathParam } = useParams();
   const contentRef = useRef<HTMLDivElement>(null);
+  useLineAnchor(contentRef);
   const prevPathRef = useRef<string | null>(null);
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [globalFilePickerOpen, setGlobalFilePickerOpen] = useState(false);
