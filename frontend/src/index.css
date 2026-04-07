@@ -154,6 +154,29 @@ code {
 }
 
 /* ──────────────────────────────────────────
+   Line anchor highlights (#L42, #L42-L50)
+   ────────────────────────────────────────── */
+.line-anchor-highlight {
+  background: rgb(59 130 246 / 0.08);
+  border-left: 3px solid rgb(59 130 246 / 0.5);
+  padding-left: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+  scroll-margin-top: 32px;
+}
+.line-anchor-highlight:hover {
+  background: rgb(59 130 246 / 0.12);
+}
+.dark .line-anchor-highlight {
+  background: rgb(59 130 246 / 0.1);
+  border-left-color: rgb(96 165 250 / 0.5);
+}
+.dark .line-anchor-highlight:hover {
+  background: rgb(59 130 246 / 0.16);
+}
+
+/* ──────────────────────────────────────────
    Review mode
    ────────────────────────────────────────── */
 

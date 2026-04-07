@@ -7,6 +7,7 @@ import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
+import rehypeSourceLines from "../lib/rehypeSourceLines";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { FrontmatterDisplay } from "./FrontmatterDisplay";
 import { parseFrontmatter } from "../lib/frontmatter";
@@ -63,7 +64,12 @@ const sanitizeSchema = {
   ],
   attributes: {
     ...defaultSchema.attributes,
-    "*": [...(defaultSchema.attributes?.["*"] || []), "className", "style"],
+    "*": [
+      ...(defaultSchema.attributes?.["*"] || []),
+      "className",
+      "style",
+      "dataSourceLine",
+    ],
     code: [...(defaultSchema.attributes?.code || []), "className"],
     span: [...(defaultSchema.attributes?.span || []), "className", "style"],
     div: [...(defaultSchema.attributes?.div || []), "className", "style"],
@@ -410,6 +416,7 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
         ]}
         rehypePlugins={[
           rehypeRaw,
+          rehypeSourceLines,
           [rehypeSanitize, sanitizeSchema],
           rehypeSlug,
           rehypeHighlight,

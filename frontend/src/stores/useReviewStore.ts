@@ -187,6 +187,13 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     const contentLines = (lastContent || "").split("\n");
     const CONTEXT = 2; // lines of context before/after selection
 
+    // Build the base URL for line anchors (works for both single and multi-repo)
+    const { currentRepo, isMultiRepo } = useRepoStore.getState();
+    const pathPrefix =
+      isMultiRepo && currentRepo
+        ? `/${currentRepo}/${filePath}`
+        : `/${filePath}`;
+
     const output = [`## Review Comments for \`${filePath}\``, ""];
     for (const c of active) {
       // Find the selected text in the file to get line numbers
@@ -196,11 +203,15 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         // Show context: a few lines before and after the selection
         const ctxStart = Math.max(0, startLine - CONTEXT);
         const ctxEnd = Math.min(contentLines.length - 1, endLine + CONTEXT);
+        const anchor =
+          startLine === endLine
+            ? `#L${startLine + 1}`
+            : `#L${startLine + 1}-L${endLine + 1}`;
         const label =
           startLine === endLine
             ? `Line ${startLine + 1}`
             : `Lines ${startLine + 1}-${endLine + 1}`;
-        output.push(`### ${label}`);
+        output.push(`### [${label}](${pathPrefix}${anchor})`);
         output.push("");
         output.push("```");
         for (let i = ctxStart; i <= ctxEnd; i++) {
@@ -220,6 +231,15 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       output.push("---");
       output.push("");
     }
+
+    // Hint for agents: how to use line anchors in responses
+    output.push(
+      "*Tip: link to specific lines with `" +
+        pathPrefix +
+        "#L42` or ranges `" +
+        pathPrefix +
+        "#L42-L50` — these highlight the referenced section in the viewer.*",
+    );
 
     try {
       await navigator.clipboard.writeText(output.join("\n"));
