@@ -6,7 +6,10 @@ modifies tracked files (lockfiles, pyproject.toml, etc.), the next
 in an unexpected state.
 """
 
+import shutil
 import subprocess
+
+import pytest
 
 
 def _git_dirty_files() -> list[str]:
@@ -20,6 +23,7 @@ def _git_dirty_files() -> list[str]:
     return [f for f in result.stdout.strip().splitlines() if f]
 
 
+@pytest.mark.skipif(shutil.which("just") is None, reason="just not installed")
 def test_setup_does_not_dirty_worktree():
     """Running `just setup` must not modify any tracked files."""
     # Record initial state
