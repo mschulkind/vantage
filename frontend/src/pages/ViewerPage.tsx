@@ -166,6 +166,8 @@ export const ViewerPage: React.FC = () => {
   const reviewComments = useReviewStore((s) => s.comments);
   const activeReviewCount = reviewComments.filter((c) => !c.resolved).length;
   const copyAllReviewComments = useReviewStore((s) => s.copyAllToClipboard);
+  const reviewSnapshots = useReviewStore((s) => s.snapshots);
+  const reviewSnapshotIndex = useReviewStore((s) => s.currentSnapshotIndex);
   const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
   const [reviewCopied, setReviewCopied] = useState(false);
 
@@ -187,6 +189,15 @@ export const ViewerPage: React.FC = () => {
     }
     reviewSetLastContent(content);
   }, [fileContent?.content, isReviewMode]);
+
+  // When viewing a past snapshot, use its content instead of the live file
+  const reviewDisplayContent = React.useMemo(() => {
+    if (!isReviewMode || reviewSnapshotIndex === null || !fileContent) {
+      return null; // use live file
+    }
+    const snap = reviewSnapshots[reviewSnapshotIndex];
+    return snap ? snap.content : null;
+  }, [isReviewMode, reviewSnapshotIndex, reviewSnapshots, fileContent]);
 
   const whatsNew = useWhatsNew();
 
@@ -1254,7 +1265,7 @@ export const ViewerPage: React.FC = () => {
                     </div>
                   ) : (
                     <MarkdownViewer
-                      content={fileContent.content}
+                      content={reviewDisplayContent ?? fileContent.content}
                       currentPath={fileContent.path}
                       isReviewMode={isReviewMode}
                     />

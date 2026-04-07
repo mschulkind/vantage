@@ -244,6 +244,7 @@ function createCommentBlock(
   } else {
     wrapper.innerHTML = `
       <div class="review-inline-comment-body">
+        <span class="review-inline-comment-icon" title="Review comment">&#x1f4ac;</span>
         <div class="review-inline-comment-text"></div>
         <button class="review-inline-comment-delete" title="Delete comment">&times;</button>
       </div>
