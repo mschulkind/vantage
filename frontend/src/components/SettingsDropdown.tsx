@@ -8,6 +8,7 @@ import {
   Sparkles,
   Eye,
   FileX,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -48,6 +49,7 @@ interface SettingsDropdownProps {
   keyboardShortcutsEnabled: boolean;
   onKeyboardShortcutsEnabledChange: (enabled: boolean) => void;
   onOpenWhatsNew?: () => void;
+  onOpenStyleGuide?: () => void;
 }
 
 export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
@@ -60,6 +62,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   keyboardShortcutsEnabled,
   onKeyboardShortcutsEnabledChange,
   onOpenWhatsNew,
+  onOpenStyleGuide,
 }) => {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(getStoredTheme);
@@ -216,23 +219,33 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
             </div>
           </div>
 
-          {onOpenWhatsNew && (
-            <>
-              <div className="h-px bg-slate-100 dark:bg-slate-700 mx-2 my-1" />
-              <div className="px-3 py-2">
-                <button
-                  onClick={() => {
-                    onOpenWhatsNew();
-                    setOpen(false);
-                  }}
-                  className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white w-full text-left py-1"
-                >
-                  <Sparkles size={13} />
-                  What's New
-                </button>
-              </div>
-            </>
-          )}
+          <div className="h-px bg-slate-100 dark:bg-slate-700 mx-2 my-1" />
+          <div className="px-3 py-2 flex flex-col gap-1">
+            {onOpenStyleGuide && (
+              <button
+                onClick={() => {
+                  onOpenStyleGuide();
+                  setOpen(false);
+                }}
+                className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white w-full text-left py-1"
+              >
+                <BookOpen size={13} />
+                Agent Style Guide
+              </button>
+            )}
+            {onOpenWhatsNew && (
+              <button
+                onClick={() => {
+                  onOpenWhatsNew();
+                  setOpen(false);
+                }}
+                className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white w-full text-left py-1"
+              >
+                <Sparkles size={13} />
+                What's New
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

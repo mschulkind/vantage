@@ -48,8 +48,10 @@ import { RecentsModal } from "../components/RecentsModal";
 import { useReviewStore } from "../stores/useReviewStore";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { ReviewToolbar } from "../components/ReviewToolbar";
-import { MessageSquarePlus, ClipboardCopy } from "lucide-react";
+import { MessageSquarePlus, ClipboardCopy, Lightbulb } from "lucide-react";
 import { useLineAnchor } from "../hooks/useLineAnchor";
+import { StyleGuideModal } from "../components/StyleGuideModal";
+import { analyzeDoc, type DocTip } from "../lib/docTips";
 
 /** Format an ISO date string as a short local datetime (e.g. "Mar 2, 2026 3:45 PM"). */
 function formatDateTime(dateStr: string): string {
@@ -207,6 +209,38 @@ export const ViewerPage: React.FC = () => {
     const total = reviewSnapshots.length + 1; // snapshots + live
     return `${reviewSnapshotIndex + 1}/${total}`;
   }, [isReviewMode, reviewSnapshotIndex, reviewSnapshots.length]);
+
+  // --- Style guide & doc tips ---
+  const [styleGuideOpen, setStyleGuideOpen] = useState(false);
+  const [dismissedTips, setDismissedTips] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem("vantage:dismissedDocTips");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const fileContentStr = fileContent?.content ?? null;
+  const docTips = React.useMemo<DocTip[]>(() => {
+    if (!fileContentStr || showRaw) return [];
+    return analyzeDoc(fileContentStr);
+  }, [fileContentStr, showRaw]);
+  const visibleTips = docTips.filter((t) => !dismissedTips.has(t.id));
+  const dismissTip = useCallback((id: string) => {
+    setDismissedTips((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem(
+          "vantage:dismissedDocTips",
+          JSON.stringify([...next]),
+        );
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
 
   const whatsNew = useWhatsNew();
 
@@ -708,6 +742,7 @@ export const ViewerPage: React.FC = () => {
                 keyboardShortcutsEnabled={keyboardShortcutsEnabled}
                 onKeyboardShortcutsEnabledChange={setKeyboardShortcutsEnabled}
                 onOpenWhatsNew={whatsNew.open}
+                onOpenStyleGuide={() => setStyleGuideOpen(true)}
               />
               <button
                 className="hidden md:block p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
@@ -1303,6 +1338,37 @@ export const ViewerPage: React.FC = () => {
                         isReviewMode={isReviewMode}
                         snapshotLabel={reviewSnapshotLabel}
                       />
+                      {visibleTips.length > 0 && (
+                        <div className="mt-6 space-y-2">
+                          {visibleTips.map((tip) => (
+                            <div
+                              key={tip.id}
+                              className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-blue-50/60 dark:bg-blue-900/15 border border-blue-100 dark:border-blue-800/30 text-sm text-blue-700 dark:text-blue-300"
+                            >
+                              <Lightbulb
+                                size={14}
+                                className="shrink-0 mt-0.5 text-blue-400"
+                              />
+                              <span className="flex-1">{tip.message}</span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  onClick={() => setStyleGuideOpen(true)}
+                                  className="text-xs text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-200 underline underline-offset-2"
+                                >
+                                  Style guide
+                                </button>
+                                <button
+                                  onClick={() => dismissTip(tip.id)}
+                                  className="text-blue-300 dark:text-blue-600 hover:text-blue-500 dark:hover:text-blue-400"
+                                  title="Dismiss"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -1473,6 +1539,11 @@ export const ViewerPage: React.FC = () => {
       <ReviewPanel
         isOpen={reviewPanelOpen}
         onClose={() => setReviewPanelOpen(false)}
+      />
+      {/* Style Guide Modal */}
+      <StyleGuideModal
+        isOpen={styleGuideOpen}
+        onClose={() => setStyleGuideOpen(false)}
       />
     </div>
   );
