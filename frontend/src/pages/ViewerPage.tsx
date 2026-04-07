@@ -199,6 +199,13 @@ export const ViewerPage: React.FC = () => {
     return snap ? snap.content : null;
   }, [isReviewMode, reviewSnapshotIndex, reviewSnapshots, fileContent]);
 
+  // e.g. "1/3" when viewing past snapshot, null when live
+  const reviewSnapshotLabel = React.useMemo(() => {
+    if (!isReviewMode || reviewSnapshotIndex === null) return null;
+    const total = reviewSnapshots.length + 1; // snapshots + live
+    return `${reviewSnapshotIndex + 1}/${total}`;
+  }, [isReviewMode, reviewSnapshotIndex, reviewSnapshots.length]);
+
   const whatsNew = useWhatsNew();
 
   // Helper to get API base
@@ -1205,7 +1212,10 @@ export const ViewerPage: React.FC = () => {
           className={cn(
             "flex-1 overflow-y-auto bg-white dark:bg-slate-900",
             isReviewMode &&
+              !reviewSnapshotLabel &&
               "ring-1 ring-inset ring-purple-200 dark:ring-purple-800/50",
+            reviewSnapshotLabel &&
+              "ring-1 ring-inset ring-amber-300 dark:ring-amber-700/50",
           )}
         >
           <div className="max-w-5xl mx-auto py-4 px-4 sm:py-6 sm:px-8">
@@ -1264,11 +1274,34 @@ export const ViewerPage: React.FC = () => {
                       </pre>
                     </div>
                   ) : (
-                    <MarkdownViewer
-                      content={reviewDisplayContent ?? fileContent.content}
-                      currentPath={fileContent.path}
-                      isReviewMode={isReviewMode}
-                    />
+                    <>
+                      {reviewSnapshotLabel && (
+                        <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 text-sm">
+                          <History size={14} className="shrink-0" />
+                          <span>
+                            Viewing past revision{" "}
+                            <strong className="font-semibold tabular-nums">
+                              {reviewSnapshotLabel}
+                            </strong>
+                            {" — "}
+                            <button
+                              onClick={() =>
+                                useReviewStore.getState().setSnapshotIndex(null)
+                              }
+                              className="font-medium text-amber-600 dark:text-amber-400 underline underline-offset-2 hover:text-amber-800 dark:hover:text-amber-200 cursor-pointer"
+                            >
+                              Go to Latest
+                            </button>
+                          </span>
+                        </div>
+                      )}
+                      <MarkdownViewer
+                        content={reviewDisplayContent ?? fileContent.content}
+                        currentPath={fileContent.path}
+                        isReviewMode={isReviewMode}
+                        snapshotLabel={reviewSnapshotLabel}
+                      />
+                    </>
                   )}
                 </div>
               )

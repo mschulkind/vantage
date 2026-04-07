@@ -359,6 +359,63 @@ code {
   background: rgb(34 197 94 / 0.12);
 }
 
+/* Revision badge on changed blocks (e.g. "1/3") */
+.review-revision-badge {
+  position: absolute;
+  top: -8px;
+  right: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgb(22 163 74); /* green-600 */
+  background: rgb(240 253 244); /* green-50 */
+  border: 1px solid rgb(34 197 94 / 0.3);
+  padding: 0 6px;
+  border-radius: 8px;
+  line-height: 16px;
+  pointer-events: none;
+  z-index: 1;
+}
+.dark .review-revision-badge {
+  color: rgb(74 222 128); /* green-400 */
+  background: rgb(20 83 45 / 0.4); /* green-900 */
+  border-color: rgb(74 222 128 / 0.3);
+}
+
+/* "Go to Latest" toast when trying to comment on changed text in past snapshot */
+.review-blocked-toast {
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 100;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(180 83 9); /* amber-700 */
+  background: rgb(254 243 199); /* amber-100 */
+  border: 1px solid rgb(245 158 11 / 0.4);
+  padding: 4px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+  pointer-events: none;
+  animation: toast-fade 2.5s ease-out forwards;
+}
+.dark .review-blocked-toast {
+  color: rgb(251 191 36); /* amber-400 */
+  background: rgb(120 53 15 / 0.8); /* amber-900 */
+  border-color: rgb(245 158 11 / 0.3);
+}
+@keyframes toast-fade {
+  0% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* ──────────────────────────────────────────
    Print stylesheet
    ────────────────────────────────────────── */

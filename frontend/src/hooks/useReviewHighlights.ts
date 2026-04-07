@@ -23,6 +23,8 @@ export function useReviewHighlights(
   currentContent: string | null,
   onDeleteComment: (id: string) => void,
   onResolveComment: (id: string) => void,
+  /** e.g. "1/3" when viewing a past snapshot, null when live */
+  snapshotLabel?: string | null,
 ) {
   // --- Comment highlights + inline comment blocks ---
   useEffect(() => {
@@ -79,11 +81,12 @@ export function useReviewHighlights(
     const el = containerRef.current;
     if (!el) return;
 
-    // Clean previous block highlights
+    // Clean previous block highlights and revision badges
     el.querySelectorAll(`[${BLOCK_ATTR}]`).forEach((node) => {
       (node as HTMLElement).removeAttribute(BLOCK_ATTR);
       (node as HTMLElement).classList.remove("review-changed-block");
     });
+    el.querySelectorAll(".review-revision-badge").forEach((n) => n.remove());
 
     if (!previousSnapshot || !currentContent) return;
 
@@ -101,9 +104,19 @@ export function useReviewHighlights(
       if (changedTexts.has(blockText)) {
         (blockEl as HTMLElement).setAttribute(BLOCK_ATTR, "true");
         (blockEl as HTMLElement).classList.add("review-changed-block");
+
+        // Add revision badge if viewing a past snapshot
+        if (snapshotLabel) {
+          const badge = document.createElement("span");
+          badge.className = "review-revision-badge";
+          badge.textContent = snapshotLabel;
+          // Insert at the start of the block so it floats top-right via CSS
+          (blockEl as HTMLElement).style.position = "relative";
+          blockEl.insertBefore(badge, blockEl.firstChild);
+        }
       }
     }
-  }, [containerRef, previousSnapshot, currentContent]);
+  }, [containerRef, previousSnapshot, currentContent, snapshotLabel]);
 }
 
 /**

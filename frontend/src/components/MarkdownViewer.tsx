@@ -25,6 +25,8 @@ interface MarkdownViewerProps {
   content: string;
   currentPath: string;
   isReviewMode?: boolean;
+  /** e.g. "1/3" when viewing a past snapshot, null when live */
+  snapshotLabel?: string | null;
 }
 
 // Sanitization schema: allows GFM, KaTeX, syntax highlighting, and heading anchors
@@ -74,10 +76,31 @@ const sanitizeSchema = {
   },
 };
 
+/** Show a brief floating toast near the selection when commenting on changed text in a past snapshot. */
+function showSelectionBlockedToast(rect: DOMRect) {
+  const existing = document.getElementById("review-blocked-toast");
+  if (existing) existing.remove();
+
+  const toast = document.createElement("div");
+  toast.id = "review-blocked-toast";
+  toast.className = "review-blocked-toast";
+  toast.textContent = "Go to Latest to comment on changed text";
+  document.body.appendChild(toast);
+
+  // Position near the selection
+  const top = rect.top + window.scrollY - 36;
+  const left = rect.left + window.scrollX + rect.width / 2;
+  toast.style.top = `${Math.max(8, top)}px`;
+  toast.style.left = `${left}px`;
+
+  setTimeout(() => toast.remove(), 2500);
+}
+
 const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
   content,
   currentPath,
   isReviewMode = false,
+  snapshotLabel = null,
 }) => {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -232,6 +255,7 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
     isReviewMode ? body : null,
     deleteComment,
     resolveComment,
+    snapshotLabel,
   );
 
   // Text selection handler for review mode.
@@ -267,13 +291,31 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
         const rect = range.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return; // collapsed rect
 
+        // When viewing a past snapshot, block selection on changed blocks
+        if (snapshotLabel) {
+          const startEl = range.startContainer.parentElement;
+          const endEl = range.endContainer.parentElement;
+          const inChanged = (node: Element | null): boolean => {
+            while (node && node !== el) {
+              if (node.hasAttribute("data-review-changed-block")) return true;
+              node = node.parentElement;
+            }
+            return false;
+          };
+          if (inChanged(startEl) || inChanged(endEl)) {
+            // Show a brief tooltip near the selection
+            showSelectionBlockedToast(rect);
+            return;
+          }
+        }
+
         setPendingSelection(text, rect);
       }, 10);
     };
 
     el.addEventListener("mouseup", handler);
     return () => el.removeEventListener("mouseup", handler);
-  }, [isReviewMode, setPendingSelection]);
+  }, [isReviewMode, setPendingSelection, snapshotLabel]);
 
   // Memoize markdown components to prevent unnecessary re-renders
   const markdownComponents = useMemo(
@@ -398,7 +440,8 @@ export const MarkdownViewer = memo(
     return (
       prevProps.content === nextProps.content &&
       prevProps.currentPath === nextProps.currentPath &&
-      prevProps.isReviewMode === nextProps.isReviewMode
+      prevProps.isReviewMode === nextProps.isReviewMode &&
+      prevProps.snapshotLabel === nextProps.snapshotLabel
     );
   },
 );
