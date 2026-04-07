@@ -180,20 +180,49 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   },
 
   copyAllToClipboard: async () => {
-    const { filePath, comments } = get();
+    const { filePath, lastContent, comments } = get();
     const active = comments.filter((c) => !c.resolved);
     if (!filePath || active.length === 0) return false;
 
-    const lines = [`## Review Comments for ${filePath}`, ""];
+    const contentLines = (lastContent || "").split("\n");
+    const CONTEXT = 2; // lines of context before/after selection
+
+    const output = [`## Review Comments for \`${filePath}\``, ""];
     for (const c of active) {
-      lines.push(`> ${c.selected_text.replace(/\n/g, "\n> ")}`);
-      lines.push("");
-      lines.push(c.comment);
-      lines.push("");
+      // Find the selected text in the file to get line numbers
+      const loc = findTextLocation(contentLines, c.selected_text);
+      if (loc) {
+        const { startLine, endLine } = loc;
+        // Show context: a few lines before and after the selection
+        const ctxStart = Math.max(0, startLine - CONTEXT);
+        const ctxEnd = Math.min(contentLines.length - 1, endLine + CONTEXT);
+        const label =
+          startLine === endLine
+            ? `Line ${startLine + 1}`
+            : `Lines ${startLine + 1}-${endLine + 1}`;
+        output.push(`### ${label}`);
+        output.push("");
+        output.push("```");
+        for (let i = ctxStart; i <= ctxEnd; i++) {
+          const marker = i >= startLine && i <= endLine ? ">" : " ";
+          output.push(
+            `${marker} ${String(i + 1).padStart(4)} | ${contentLines[i]}`,
+          );
+        }
+        output.push("```");
+      } else {
+        // Fallback: just quote the selected text
+        output.push(`> ${c.selected_text.replace(/\n/g, "\n> ")}`);
+      }
+      output.push("");
+      output.push(`**Comment:** ${c.comment}`);
+      output.push("");
+      output.push("---");
+      output.push("");
     }
 
     try {
-      await navigator.clipboard.writeText(lines.join("\n"));
+      await navigator.clipboard.writeText(output.join("\n"));
       return true;
     } catch {
       return false;
@@ -218,3 +247,37 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     });
   },
 }));
+
+/**
+ * Find the line range of `needle` in the source lines.
+ * The needle comes from rendered markdown text selection, so we normalize
+ * whitespace for matching against the raw markdown source.
+ */
+function findTextLocation(
+  lines: string[],
+  needle: string,
+): { startLine: number; endLine: number } | null {
+  const full = lines.join("\n");
+  const idx = full.indexOf(needle);
+  if (idx !== -1) {
+    const startLine = full.substring(0, idx).split("\n").length - 1;
+    const endLine = startLine + needle.split("\n").length - 1;
+    return { startLine, endLine };
+  }
+
+  // Fuzzy: normalize whitespace (rendered text collapses whitespace)
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+  const needleNorm = norm(needle);
+
+  // Sliding window over lines
+  for (let start = 0; start < lines.length; start++) {
+    let acc = "";
+    for (let end = start; end < lines.length && end < start + 50; end++) {
+      acc += (end > start ? " " : "") + lines[end];
+      if (norm(acc).includes(needleNorm)) {
+        return { startLine: start, endLine: end };
+      }
+    }
+  }
+  return null;
+}
