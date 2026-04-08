@@ -3,14 +3,16 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeRaw from "rehype-raw";
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import rehypeSanitize from "rehype-sanitize";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
-import rehypeSourceLines from "../lib/rehypeSourceLines";
-import { MermaidDiagram } from "./MermaidDiagram";
-import { FrontmatterDisplay } from "./FrontmatterDisplay";
-import { parseFrontmatter } from "../lib/frontmatter";
+import {
+  rehypeSourceLines,
+  parseFrontmatter,
+  sanitizeSchema,
+} from "vantage-md";
+import { MermaidDiagram, FrontmatterDisplay } from "vantage-md/react";
 import "highlight.js/styles/github.css";
 import "katex/dist/katex.min.css";
 import { useNavigate } from "react-router-dom";
@@ -29,58 +31,6 @@ interface MarkdownViewerProps {
   /** e.g. "1/3" when viewing a past snapshot, null when live */
   snapshotLabel?: string | null;
 }
-
-// Sanitization schema: allows GFM, KaTeX, syntax highlighting, and heading anchors
-// while blocking scripts, event handlers, iframes, and other XSS vectors.
-const sanitizeSchema = {
-  ...defaultSchema,
-  tagNames: [
-    ...(defaultSchema.tagNames || []),
-    // KaTeX elements
-    "math",
-    "semantics",
-    "mrow",
-    "mi",
-    "mo",
-    "mn",
-    "msup",
-    "msub",
-    "mfrac",
-    "mover",
-    "munder",
-    "msqrt",
-    "mroot",
-    "mtable",
-    "mtr",
-    "mtd",
-    "mtext",
-    "mspace",
-    "annotation",
-    // Other
-    "figure",
-    "figcaption",
-    "summary",
-    "details",
-  ],
-  attributes: {
-    ...defaultSchema.attributes,
-    "*": [
-      ...(defaultSchema.attributes?.["*"] || []),
-      "className",
-      "style",
-      "dataSourceLine",
-    ],
-    code: [...(defaultSchema.attributes?.code || []), "className"],
-    span: [...(defaultSchema.attributes?.span || []), "className", "style"],
-    div: [...(defaultSchema.attributes?.div || []), "className", "style"],
-    a: [...(defaultSchema.attributes?.a || []), "id", "className"],
-    math: ["xmlns"],
-    annotation: ["encoding"],
-    img: [...(defaultSchema.attributes?.img || []), "loading"],
-    td: [...(defaultSchema.attributes?.td || []), "style"],
-    th: [...(defaultSchema.attributes?.th || []), "style"],
-  },
-};
 
 /** Show a brief floating toast near the selection when commenting on changed text in a past snapshot. */
 function showSelectionBlockedToast(rect: DOMRect) {

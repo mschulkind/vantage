@@ -31,6 +31,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), dropLegacyFonts(), changelogPlugin()],
     envDir: envDir,
+    resolve: {
+      dedupe: ["react", "react-dom"],
+    },
     build: {
       rollupOptions: {
         output: {

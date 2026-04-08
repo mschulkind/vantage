@@ -239,15 +239,6 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       output.push("");
     }
 
-    // Hint for agents: how to use line anchors in responses
-    output.push(
-      "*Tip: link to specific lines with `" +
-        pathPrefix +
-        "#L42` or ranges `" +
-        pathPrefix +
-        "#L42-L50` — these highlight the referenced section in the viewer.*",
-    );
-
     try {
       await navigator.clipboard.writeText(output.join("\n"));
       return true;
