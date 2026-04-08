@@ -1,6 +1,6 @@
 {
   "name": "vantage-md",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Markdown rendering pipeline with GitHub-style line anchors, mermaid diagrams, KaTeX math, and syntax highlighting",
   "type": "module",
   "main": "./dist/index.cjs",
