@@ -276,10 +276,9 @@ release bump="patch":
 
     # — 7. Push + publish —
     git push origin main --follow-tags
-    uv publish
     cd packages/vantage-md && npm publish && cd ../..
 
-    # — 8. GitHub release —
+    # — 8. GitHub release (with Python wheel + tarball as assets) —
     gh release create "v${new_py}" dist/*.whl dist/*.tar.gz \
         --title "v${new_py}" \
         --generate-notes
