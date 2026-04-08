@@ -51,6 +51,7 @@ import { ReviewToolbar } from "../components/ReviewToolbar";
 import { MessageSquarePlus, ClipboardCopy, Lightbulb } from "lucide-react";
 import { useLineAnchor } from "../hooks/useLineAnchor";
 import { StyleGuideModal } from "../components/StyleGuideModal";
+import { Modal } from "../components/Modal";
 import { analyzeDoc, type DocTip } from "../lib/docTips";
 
 /** Format an ISO date string as a short local datetime (e.g. "Mar 2, 2026 3:45 PM"). */
@@ -163,6 +164,8 @@ export const ViewerPage: React.FC = () => {
   // --- Review mode ---
   const isReviewMode = useReviewStore((s) => s.isReviewMode);
   const toggleReviewMode = useReviewStore((s) => s.toggleReviewMode);
+  const endReview = useReviewStore((s) => s.endReview);
+  const hasReviewData = useReviewStore((s) => s.hasReviewData);
   const loadReview = useReviewStore((s) => s.loadReview);
   const reviewAddSnapshot = useReviewStore((s) => s.addSnapshot);
   const reviewSetLastContent = useReviewStore((s) => s.setLastContent);
@@ -174,6 +177,18 @@ export const ViewerPage: React.FC = () => {
   const reviewSnapshotIndex = useReviewStore((s) => s.currentSnapshotIndex);
   const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
   const [reviewCopied, setReviewCopied] = useState(false);
+  const [showEndReviewConfirm, setShowEndReviewConfirm] = useState(false);
+
+  const handleReviewToggle = useCallback(() => {
+    if (isReviewMode && hasReviewData()) {
+      setShowEndReviewConfirm(true);
+    } else if (isReviewMode) {
+      // No data, just turn off
+      endReview();
+    } else {
+      toggleReviewMode();
+    }
+  }, [isReviewMode, hasReviewData, endReview, toggleReviewMode]);
 
   // Load review data when file changes
   useEffect(() => {
@@ -1054,7 +1069,7 @@ export const ViewerPage: React.FC = () => {
                   !showRaw && (
                     <>
                       <button
-                        onClick={toggleReviewMode}
+                        onClick={handleReviewToggle}
                         className={cn(
                           "flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 transition-colors cursor-pointer",
                           isReviewMode
@@ -1180,7 +1195,7 @@ export const ViewerPage: React.FC = () => {
                 {!showRaw && (
                   <>
                     <button
-                      onClick={toggleReviewMode}
+                      onClick={handleReviewToggle}
                       className={cn(
                         "flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 transition-colors cursor-pointer",
                         isReviewMode
@@ -1545,6 +1560,55 @@ export const ViewerPage: React.FC = () => {
         isOpen={styleGuideOpen}
         onClose={() => setStyleGuideOpen(false)}
       />
+      {/* End Review Confirmation */}
+      {showEndReviewConfirm && (
+        <Modal
+          isOpen={showEndReviewConfirm}
+          onClose={() => setShowEndReviewConfirm(false)}
+          title="End Review?"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              This will clear{" "}
+              <strong>
+                {reviewComments.length} comment
+                {reviewComments.length !== 1 && "s"}
+              </strong>
+              {reviewSnapshots.length > 0 && (
+                <>
+                  {" "}
+                  and{" "}
+                  <strong>
+                    {reviewSnapshots.length} revision snapshot
+                    {reviewSnapshots.length !== 1 && "s"}
+                  </strong>
+                </>
+              )}
+              . This cannot be undone.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              Tip: copy your comments to the clipboard first if you need them.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowEndReviewConfirm(false)}
+                className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowEndReviewConfirm(false);
+                  endReview();
+                }}
+                className="px-3 py-1.5 text-sm text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors"
+              >
+                End Review & Clear Data
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

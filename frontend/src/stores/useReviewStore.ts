@@ -51,6 +51,10 @@ interface ReviewState {
   setLastContent: (content: string) => void;
   copyAllToClipboard: () => Promise<boolean>;
   deleteReview: () => Promise<void>;
+  /** End review mode and clear all data (comments, snapshots). */
+  endReview: () => Promise<void>;
+  /** Whether ending review mode needs confirmation (has data to lose). */
+  hasReviewData: () => boolean;
 }
 
 export const useReviewStore = create<ReviewState>((set, get) => ({
@@ -90,10 +94,13 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         params: { path: filePath },
       });
       if (data) {
+        const hasData = data.comments.length > 0 || data.snapshots.length > 0;
         set({
           comments: data.comments,
           snapshots: data.snapshots,
           filePath: data.file_path,
+          // Auto-enable review mode if there's existing review data
+          ...(hasData ? { isReviewMode: true } : {}),
         });
       }
     } catch {
@@ -265,6 +272,34 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       currentSnapshotIndex: null,
       pendingSelection: null,
     });
+  },
+
+  endReview: async () => {
+    const { filePath } = get();
+    const base = getApiBase();
+
+    // Delete server-side review data if it exists
+    if (base && filePath) {
+      try {
+        await axios.delete(`${base}/review`, { params: { path: filePath } });
+      } catch {
+        // ignore
+      }
+    }
+
+    set({
+      isReviewMode: false,
+      comments: [],
+      snapshots: [],
+      currentSnapshotIndex: null,
+      pendingSelection: null,
+      lastContent: null,
+    });
+  },
+
+  hasReviewData: () => {
+    const { comments, snapshots } = get();
+    return comments.length > 0 || snapshots.length > 0;
   },
 }));
 
