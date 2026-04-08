@@ -4,6 +4,9 @@ import { changelogPlugin } from "./vite-changelog-plugin";
 
 export default defineConfig({
   plugins: [react(), changelogPlugin()],
+  resolve: {
+    dedupe: ["react", "react-dom"],
+  },
   test: {
     globals: true,
     environment: "jsdom",

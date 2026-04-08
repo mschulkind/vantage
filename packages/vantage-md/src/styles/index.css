@@ -1,0 +1,7 @@
+/* vantage-md styles
+ *
+ * Import this file to get line-anchor highlight styles.
+ * Usage: import "vantage-md/styles";
+ */
+
+@import "./line-anchor.css";

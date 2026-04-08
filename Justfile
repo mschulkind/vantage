@@ -224,6 +224,106 @@ clean:
     python3 -c "import shutil; from pathlib import Path; \
         [shutil.rmtree(p) for p in [Path('dist'), Path('build'), Path('src/vantage/frontend_dist'), Path('src/vantage.egg-info')] if p.exists()]"
 
+# ── Release ─────────────────────────────────────────────────────────
+
+# Release both packages: tag, build, publish to PyPI + npm, create GitHub release.
+# Usage: just release patch  (or: minor, major)
+release bump="patch":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # — 1. Compute new Python version —
+    cur_py=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+    IFS='.' read -r maj min pat <<< "$cur_py"
+    case "{{bump}}" in
+        major) new_py="$((maj+1)).0.0" ;;
+        minor) new_py="${maj}.$((min+1)).0" ;;
+        patch) new_py="${maj}.${min}.$((pat+1))" ;;
+        *)     echo "Usage: just release [major|minor|patch]"; exit 1 ;;
+    esac
+
+    # — 2. Compute new npm version —
+    cur_npm=$(node -p "require('./packages/vantage-md/package.json').version")
+    IFS='.' read -r nmaj nmin npat <<< "$cur_npm"
+    case "{{bump}}" in
+        major) new_npm="$((nmaj+1)).0.0" ;;
+        minor) new_npm="${nmaj}.$((nmin+1)).0" ;;
+        patch) new_npm="${nmaj}.${nmin}.$((npat+1))" ;;
+    esac
+
+    echo "Python:  ${cur_py} → ${new_py}"
+    echo "npm:     ${cur_npm} → ${new_npm}"
+    echo ""
+    read -rp "Proceed? [y/N] " confirm
+    [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
+
+    # — 3. Bump versions in source —
+    sed -i "s/^version = \"${cur_py}\"/version = \"${new_py}\"/" pyproject.toml
+    cd packages/vantage-md && npm version "${new_npm}" --no-git-tag-version && cd ../..
+    # Keep frontend lockfile in sync
+    cd frontend && npm install && cd ..
+
+    # — 4. Commit + tag —
+    git add pyproject.toml packages/vantage-md/package.json frontend/package-lock.json
+    git commit -m "release: v${new_py} / vantage-md@${new_npm}"
+    git tag -a "v${new_py}" -m "v${new_py}"
+
+    # — 5. Build Python package —
+    just build
+
+    # — 6. Build npm package —
+    cd packages/vantage-md && npx tsup && cd ../..
+
+    # — 7. Push + publish —
+    git push origin main --follow-tags
+    uv publish
+    cd packages/vantage-md && npm publish && cd ../..
+
+    # — 8. GitHub release —
+    gh release create "v${new_py}" dist/*.whl dist/*.tar.gz \
+        --title "v${new_py}" \
+        --generate-notes
+
+    echo ""
+    echo "Released: vantage v${new_py} + vantage-md@${new_npm}"
+
+# Release only the npm package (vantage-md).
+# Usage: just release-npm patch
+release-npm bump="patch":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    cur=$(node -p "require('./packages/vantage-md/package.json').version")
+    IFS='.' read -r maj min pat <<< "$cur"
+    case "{{bump}}" in
+        major) new="$((maj+1)).0.0" ;;
+        minor) new="${maj}.$((min+1)).0" ;;
+        patch) new="${maj}.${min}.$((pat+1))" ;;
+        *)     echo "Usage: just release-npm [major|minor|patch]"; exit 1 ;;
+    esac
+
+    echo "vantage-md: ${cur} → ${new}"
+    read -rp "Proceed? [y/N] " confirm
+    [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
+
+    cd packages/vantage-md
+    npm version "${new}" --no-git-tag-version
+    npx tsup
+    cd ../..
+
+    # Keep frontend lockfile in sync
+    cd frontend && npm install && cd ..
+
+    git add packages/vantage-md/package.json frontend/package-lock.json
+    git commit -m "release: vantage-md@${new}"
+    git tag -a "vantage-md@${new}" -m "vantage-md@${new}"
+
+    git push origin main --follow-tags
+    cd packages/vantage-md && npm publish
+
+    echo ""
+    echo "Released: vantage-md@${new}"
+
 # Build the static user guide docs
 build-docs:
     #!/usr/bin/env bash

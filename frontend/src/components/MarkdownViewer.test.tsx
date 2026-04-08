@@ -3,12 +3,16 @@ import { describe, it, expect, vi } from "vitest";
 import { MarkdownViewer } from "./MarkdownViewer";
 import { BrowserRouter } from "react-router-dom";
 
-// Mock MermaidDiagram
-vi.mock("./MermaidDiagram", () => ({
-  MermaidDiagram: ({ code }: { code: string }) => (
-    <div data-testid="mermaid-diagram">{code}</div>
-  ),
-}));
+// Mock MermaidDiagram (imported from vantage-md/react by MarkdownViewer)
+vi.mock("vantage-md/react", async () => {
+  const actual = await vi.importActual("vantage-md/react");
+  return {
+    ...actual,
+    MermaidDiagram: ({ code }: { code: string }) => (
+      <div data-testid="mermaid-diagram">{code}</div>
+    ),
+  };
+});
 
 // Mock useNavigate
 const mockNavigate = vi.fn();
