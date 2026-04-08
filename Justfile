@@ -257,28 +257,31 @@ release bump="patch":
     read -rp "Proceed? [y/N] " confirm
     [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
 
-    # — 3. Bump versions in source —
+    # — 3. Run checks before touching anything —
+    just check-ci
+
+    # — 4. Bump versions in source —
     sed -i "s/^version = \"${cur_py}\"/version = \"${new_py}\"/" pyproject.toml
     cd packages/vantage-md && npm version "${new_npm}" --no-git-tag-version && cd ../..
     # Keep frontend lockfile in sync
     cd frontend && npm install && cd ..
 
-    # — 4. Commit + tag —
+    # — 5. Commit + tag —
     git add pyproject.toml packages/vantage-md/package.json frontend/package-lock.json
-    git commit -m "release: v${new_py} / vantage-md@${new_npm}"
+    git commit -m "release: v${new_py} / vantage-md@${new_npm}" --no-verify
     git tag -a "v${new_py}" -m "v${new_py}"
 
-    # — 5. Build Python package —
+    # — 6. Build Python package —
     just build
 
-    # — 6. Build npm package —
+    # — 7. Build npm package —
     cd packages/vantage-md && npx tsup && cd ../..
 
-    # — 7. Push + publish —
+    # — 8. Push + publish —
     git push origin main --follow-tags
     cd packages/vantage-md && npm publish && cd ../..
 
-    # — 8. GitHub release (with Python wheel + tarball as assets) —
+    # — 9. GitHub release (with Python wheel + tarball as assets) —
     gh release create "v${new_py}" dist/*.whl dist/*.tar.gz \
         --title "v${new_py}" \
         --generate-notes
@@ -305,6 +308,8 @@ release-npm bump="patch":
     read -rp "Proceed? [y/N] " confirm
     [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
 
+    just check-ci
+
     cd packages/vantage-md
     npm version "${new}" --no-git-tag-version
     npx tsup
@@ -314,7 +319,7 @@ release-npm bump="patch":
     cd frontend && npm install && cd ..
 
     git add packages/vantage-md/package.json frontend/package-lock.json
-    git commit -m "release: vantage-md@${new}"
+    git commit -m "release: vantage-md@${new}" --no-verify
     git tag -a "vantage-md@${new}" -m "vantage-md@${new}"
 
     git push origin main --follow-tags
