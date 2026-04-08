@@ -21,6 +21,8 @@ export {
   parseLineAnchor,
   parseFrontmatter,
   sanitizeSchema,
+  renderMermaidBlocks,
+  resolveLinks,
 } from "./index.js";
 
 export type {
@@ -28,4 +30,6 @@ export type {
   RenderResult,
   ParsedFrontmatter,
   FrontmatterFormat,
+  RenderMermaidOptions,
+  ResolveLinkOptions,
 } from "./index.js";

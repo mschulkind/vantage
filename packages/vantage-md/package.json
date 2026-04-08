@@ -27,7 +27,8 @@
         "default": "./dist/react.cjs"
       }
     },
-    "./styles": "./dist/styles.css"
+    "./styles": "./dist/styles.css",
+    "./prose": "./dist/prose.css"
   },
   "files": [
     "dist"

@@ -1,0 +1,210 @@
+/*
+ * vantage-md/prose — GitHub-style markdown prose styling
+ *
+ * Apply the `.vantage-prose` class to your markdown container.
+ * Supports light and dark mode (via `.dark` parent class).
+ *
+ * Usage:
+ *   import "vantage-md/prose";
+ *
+ *   <div class="vantage-prose">rendered html here</div>
+ */
+
+.vantage-prose {
+  color: #334155; /* slate-700 */
+  line-height: 1.7;
+  max-width: none;
+}
+
+.dark .vantage-prose {
+  color: #cbd5e1; /* slate-300 */
+}
+
+/* ── Headings ── */
+.vantage-prose h1,
+.vantage-prose h2,
+.vantage-prose h3,
+.vantage-prose h4,
+.vantage-prose h5,
+.vantage-prose h6 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0f172a; /* slate-900 */
+}
+
+.dark .vantage-prose h1,
+.dark .vantage-prose h2,
+.dark .vantage-prose h3,
+.dark .vantage-prose h4,
+.dark .vantage-prose h5,
+.dark .vantage-prose h6 {
+  color: #f1f5f9; /* slate-100 */
+}
+
+.vantage-prose h1 {
+  font-size: 2em;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #e2e8f0; /* slate-200 */
+}
+
+.dark .vantage-prose h1 {
+  border-bottom-color: #334155; /* slate-700 */
+}
+
+.vantage-prose h2 {
+  font-size: 1.5em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dark .vantage-prose h2 {
+  border-bottom-color: #334155;
+}
+
+.vantage-prose h3 {
+  font-size: 1.25em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.vantage-prose h4 {
+  font-size: 1em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Paragraphs ── */
+.vantage-prose p {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* ── Lists ── */
+.vantage-prose ul {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  list-style-type: disc;
+  padding-left: 2em;
+}
+
+.vantage-prose ol {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  padding-left: 2em;
+}
+
+.vantage-prose li {
+  margin-top: 0.125rem;
+  margin-bottom: 0.125rem;
+}
+
+/* ── Code blocks ── */
+.vantage-prose pre {
+  background: #f8fafc; /* slate-50 */
+  border: 1px solid #e2e8f0; /* slate-200 */
+  padding: 1rem;
+  border-radius: 0.375rem;
+  font-size: 85%;
+  line-height: 1.45;
+  overflow-x: auto;
+}
+
+.dark .vantage-prose pre {
+  background: #1e293b; /* slate-800 */
+  border-color: #334155; /* slate-700 */
+}
+
+/* ── Inline code ── */
+.vantage-prose code {
+  background: #f1f5f9; /* slate-100 */
+  padding: 0.2em 0.4em;
+  border-radius: 0.375rem;
+  font-size: 85%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: normal;
+  border: 1px solid rgb(226 232 240 / 0.5); /* slate-200/50 */
+  color: #1e293b; /* slate-800 */
+}
+
+.dark .vantage-prose code {
+  background: #1e293b; /* slate-800 */
+  border-color: rgb(51 65 85 / 0.5); /* slate-700/50 */
+  color: #e2e8f0; /* slate-200 */
+}
+
+/* Don't double-style code inside pre */
+.vantage-prose pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+  border: none;
+  color: inherit;
+}
+
+/* ── Links ── */
+.vantage-prose a {
+  color: #2563eb; /* blue-600 */
+  text-decoration: none;
+}
+
+.vantage-prose a:hover {
+  text-decoration: underline;
+}
+
+.dark .vantage-prose a {
+  color: #60a5fa; /* blue-400 */
+}
+
+/* ── Images ── */
+.vantage-prose img {
+  border-radius: 0.5rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* ── Blockquotes ── */
+.vantage-prose blockquote {
+  border-left: 0.25em solid #cbd5e1; /* slate-300 */
+  padding-left: 1rem;
+  color: #475569; /* slate-600 */
+  font-style: italic;
+}
+
+.dark .vantage-prose blockquote {
+  border-left-color: #475569; /* slate-600 */
+  color: #94a3b8; /* slate-400 */
+}
+
+/* ── Tables ── */
+.vantage-prose table {
+  font-size: 0.875rem;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.vantage-prose th,
+.vantage-prose td {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #e2e8f0; /* slate-200 */
+}
+
+.dark .vantage-prose th,
+.dark .vantage-prose td {
+  border-color: #334155; /* slate-700 */
+}
+
+/* ── Horizontal rules ── */
+.vantage-prose hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 1.5rem 0;
+}
+
+.dark .vantage-prose hr {
+  border-top-color: #334155;
+}

@@ -38,9 +38,12 @@ export default defineConfig([
       options.jsx = "automatic";
     },
   },
-  // CSS entry
+  // CSS entries
   {
-    entry: { styles: "src/styles/index.css" },
+    entry: {
+      styles: "src/styles/index.css",
+      prose: "src/styles/prose.css",
+    },
     outDir: "dist",
   },
 ]);
