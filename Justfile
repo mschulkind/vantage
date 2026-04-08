@@ -20,6 +20,7 @@ setup:
         uv venv --relocatable
     fi
     uv sync --frozen
+    cd packages/vantage-md && npm ci && npx tsup && cd ../..
     cd frontend && npm ci
 
 # Run the backend server in development mode
@@ -139,6 +140,9 @@ _ensure-env:
         uv venv --relocatable
     fi
     uv sync --frozen
+    if [ ! -d packages/vantage-md/node_modules ]; then
+        cd packages/vantage-md && npm ci && npx tsup && cd ../..
+    fi
     if [ ! -d frontend/node_modules ]; then
         cd frontend && npm ci
     fi
