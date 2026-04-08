@@ -226,13 +226,16 @@ clean:
 
 # ── Release ─────────────────────────────────────────────────────────
 
-# Release both packages: tag, build, publish to PyPI + npm, create GitHub release.
+# Release both packages: tag, build, publish to npm, create GitHub release.
 # Usage: just release patch  (or: minor, major)
-release bump="patch":
+release bump="patch": _ensure-env
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # — 1. Compute new Python version —
+    # — 1. Preflight: run all checks on current code —
+    just check-ci
+
+    # — 2. Compute new versions —
     cur_py=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
     IFS='.' read -r maj min pat <<< "$cur_py"
     case "{{bump}}" in
@@ -242,7 +245,6 @@ release bump="patch":
         *)     echo "Usage: just release [major|minor|patch]"; exit 1 ;;
     esac
 
-    # — 2. Compute new npm version —
     cur_npm=$(node -p "require('./packages/vantage-md/package.json').version")
     IFS='.' read -r nmaj nmin npat <<< "$cur_npm"
     case "{{bump}}" in
@@ -251,37 +253,32 @@ release bump="patch":
         patch) new_npm="${nmaj}.${nmin}.$((npat+1))" ;;
     esac
 
+    echo ""
     echo "Python:  ${cur_py} → ${new_py}"
     echo "npm:     ${cur_npm} → ${new_npm}"
     echo ""
     read -rp "Proceed? [y/N] " confirm
     [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
 
-    # — 3. Run checks before touching anything —
-    just check-ci
-
-    # — 4. Bump versions in source —
+    # — 3. Bump versions in source —
     sed -i "s/^version = \"${cur_py}\"/version = \"${new_py}\"/" pyproject.toml
     cd packages/vantage-md && npm version "${new_npm}" --no-git-tag-version && cd ../..
-    # Keep frontend lockfile in sync
     cd frontend && npm install && cd ..
 
-    # — 5. Commit + tag —
+    # — 4. Commit + tag —
     git add pyproject.toml packages/vantage-md/package.json frontend/package-lock.json
     git commit -m "release: v${new_py} / vantage-md@${new_npm}" --no-verify
     git tag -a "v${new_py}" -m "v${new_py}"
 
-    # — 6. Build Python package —
+    # — 5. Build both packages —
     just build
-
-    # — 7. Build npm package —
     cd packages/vantage-md && npx tsup && cd ../..
 
-    # — 8. Push + publish —
+    # — 6. Push + publish —
     git push origin main --follow-tags
     cd packages/vantage-md && npm publish && cd ../..
 
-    # — 9. GitHub release (with Python wheel + tarball as assets) —
+    # — 7. GitHub release (with Python wheel + tarball as assets) —
     gh release create "v${new_py}" dist/*.whl dist/*.tar.gz \
         --title "v${new_py}" \
         --generate-notes
@@ -291,10 +288,14 @@ release bump="patch":
 
 # Release only the npm package (vantage-md).
 # Usage: just release-npm patch
-release-npm bump="patch":
+release-npm bump="patch": _ensure-env
     #!/usr/bin/env bash
     set -euo pipefail
 
+    # — 1. Preflight —
+    just check-ci
+
+    # — 2. Compute new version —
     cur=$(node -p "require('./packages/vantage-md/package.json').version")
     IFS='.' read -r maj min pat <<< "$cur"
     case "{{bump}}" in
@@ -304,24 +305,23 @@ release-npm bump="patch":
         *)     echo "Usage: just release-npm [major|minor|patch]"; exit 1 ;;
     esac
 
+    echo ""
     echo "vantage-md: ${cur} → ${new}"
     read -rp "Proceed? [y/N] " confirm
     [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
 
-    just check-ci
-
+    # — 3. Bump, build, commit —
     cd packages/vantage-md
     npm version "${new}" --no-git-tag-version
     npx tsup
     cd ../..
-
-    # Keep frontend lockfile in sync
     cd frontend && npm install && cd ..
 
     git add packages/vantage-md/package.json frontend/package-lock.json
     git commit -m "release: vantage-md@${new}" --no-verify
     git tag -a "vantage-md@${new}" -m "vantage-md@${new}"
 
+    # — 4. Push + publish —
     git push origin main --follow-tags
     cd packages/vantage-md && npm publish
 
