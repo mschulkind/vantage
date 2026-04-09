@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node with npm registry
         uses: actions/setup-node@v4
         with:
-          node-version-file: .mise.toml
+          node-version: "22"
           registry-url: https://registry.npmjs.org
 
       - name: Install Python dependencies
