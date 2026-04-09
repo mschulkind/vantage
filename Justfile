@@ -141,7 +141,10 @@ _ensure-env:
     fi
     uv sync --frozen
     if [ ! -d packages/vantage-md/node_modules ]; then
-        cd packages/vantage-md && npm ci && npx tsup && cd ../..
+        cd packages/vantage-md && npm ci && cd ../..
+    fi
+    if [ ! -d packages/vantage-md/dist ]; then
+        cd packages/vantage-md && npx tsup && cd ../..
     fi
     if [ ! -d frontend/node_modules ]; then
         cd frontend && npm ci
