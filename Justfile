@@ -261,7 +261,7 @@ release bump="patch": _ensure-env
     echo "Python:  ${cur_py} → ${new_py}"
     echo "npm:     ${cur_npm} → ${new_npm}"
     echo ""
-    read -rp "Proceed? [y/N] " confirm </dev/tty>
+    read -rp "Proceed? [y/N] " confirm < /dev/tty
     [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
 
     # — 3. Bump versions in source —
@@ -302,7 +302,7 @@ release-npm bump="patch": _ensure-env
 
     echo ""
     echo "vantage-md: ${cur} → ${new}"
-    read -rp "Proceed? [y/N] " confirm </dev/tty>
+    read -rp "Proceed? [y/N] " confirm < /dev/tty
     [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
 
     # — 3. Bump, build, commit —
