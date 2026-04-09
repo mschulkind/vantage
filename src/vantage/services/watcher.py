@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -11,6 +12,97 @@ from vantage.services.socket_manager import manager
 from vantage.settings import get_daemon_config, settings
 
 logger = logging.getLogger(__name__)
+
+
+def _read_inotify_limit(name: str) -> int | None:
+    """Read an inotify sysctl from /proc.  Returns None on non-Linux or errors."""
+    try:
+        with open(f"/proc/sys/fs/inotify/{name}") as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _count_inotify_usage() -> tuple[int, int] | None:
+    """Return (instances, watches) held by the current process.
+
+    Walks ``/proc/self/fd`` looking for ``anon_inode:inotify`` links, then
+    counts ``inotify wd:`` lines in each corresponding fdinfo file.  Returns
+    None on non-Linux or if /proc is unavailable.
+    """
+    try:
+        fd_dir = "/proc/self/fd"
+        entries = os.listdir(fd_dir)
+    except OSError:
+        return None
+
+    instances = 0
+    watches = 0
+    for fd in entries:
+        try:
+            link = os.readlink(os.path.join(fd_dir, fd))
+        except OSError:
+            continue
+        if link != "anon_inode:inotify":
+            continue
+        instances += 1
+        try:
+            with open(f"/proc/self/fdinfo/{fd}") as f:
+                for line in f:
+                    if line.startswith("inotify wd:"):
+                        watches += 1
+        except OSError:
+            continue
+    return instances, watches
+
+
+def _log_inotify_limits() -> None:
+    """Log inotify sysctl limits (once, at watcher startup)."""
+    max_watches = _read_inotify_limit("max_user_watches")
+    max_instances = _read_inotify_limit("max_user_instances")
+    if max_watches is None and max_instances is None:
+        logger.info("[watcher] inotify limits unavailable (non-Linux or /proc not mounted)")
+        return
+    logger.info(
+        "[watcher] inotify limits: max_user_watches=%s max_user_instances=%s",
+        max_watches if max_watches is not None else "?",
+        max_instances if max_instances is not None else "?",
+    )
+
+
+def _log_inotify_usage(context: str) -> None:
+    """Log current-process inotify usage and warn if close to the ceiling."""
+    usage = _count_inotify_usage()
+    if usage is None:
+        return
+    instances, watches = usage
+    max_watches = _read_inotify_limit("max_user_watches")
+    max_instances = _read_inotify_limit("max_user_instances")
+    logger.info(
+        "[watcher] inotify usage (%s): instances=%d watches=%d",
+        context,
+        instances,
+        watches,
+    )
+    # Warn if we're within 10% of either limit — watchfiles fails silently
+    # when notify runs out of watches, which manifests as "live reload
+    # stopped working for some files".
+    if max_watches and watches >= max_watches * 0.9:
+        logger.warning(
+            "[watcher] inotify watches=%d is ≥90%% of max_user_watches=%d — "
+            "file changes in unwatched subtrees will be missed. "
+            "Bump with: sudo sysctl fs.inotify.max_user_watches=524288",
+            watches,
+            max_watches,
+        )
+    if max_instances and instances >= max_instances * 0.9:
+        logger.warning(
+            "[watcher] inotify instances=%d is ≥90%% of max_user_instances=%d — "
+            "bump with: sudo sysctl fs.inotify.max_user_instances=1024",
+            instances,
+            max_instances,
+        )
+
 
 # Event used to signal the multi-repo watcher to restart (e.g. when new
 # repos are discovered).  The watcher thread checks this periodically.
@@ -121,6 +213,7 @@ async def watch_repo():
     (potentially slow) inotify initialization never blocks the event loop.
     """
     logger.info(f"Starting watcher for {settings.target_repo}")
+    _log_inotify_limits()
     target = settings.target_repo.resolve()
 
     loop = asyncio.get_running_loop()
@@ -130,11 +223,19 @@ async def watch_repo():
         logger.info("Initializing file watcher...")
         t0 = time.monotonic()
         first = True
-        for changes in watch(target, watch_filter=_GitAwareFilter()):
-            if first:
-                logger.info("[startup] file watcher ready (%.0fms)", (time.monotonic() - t0) * 1000)
-                first = False
-            loop.call_soon_threadsafe(queue.put_nowait, changes)
+        try:
+            for changes in watch(target, watch_filter=_GitAwareFilter()):
+                if first:
+                    logger.info(
+                        "[startup] file watcher ready (%.0fms)", (time.monotonic() - t0) * 1000
+                    )
+                    _log_inotify_usage("after startup")
+                    first = False
+                for change, path in changes:
+                    logger.info("[watcher] %s %s", change.name, path)
+                loop.call_soon_threadsafe(queue.put_nowait, changes)
+        except Exception:
+            logger.exception("[watcher] watch() thread crashed — live reload will stop")
 
     thread = threading.Thread(target=_run_sync_watcher, daemon=True)
     thread.start()
@@ -196,6 +297,8 @@ async def watch_multi_repo():
         await watch_repo()
         return
 
+    _log_inotify_limits()
+
     loop = asyncio.get_running_loop()
     pending: dict[str, set[str]] = {}  # repo_name -> paths
     batch_start: float | None = None
@@ -228,17 +331,24 @@ async def watch_multi_repo():
             logger.info("Initializing file watchers for %d repos...", len(paths))
             t0 = time.monotonic()
             first = True
-            for changes in watch(
-                *paths,
-                watch_filter=_GitAwareFilter(),
-                stop_event=_watcher_stop_event,
-            ):
-                if first:
-                    logger.info(
-                        "[startup] file watchers ready (%.0fms)", (time.monotonic() - t0) * 1000
-                    )
-                    first = False
-                loop.call_soon_threadsafe(q.put_nowait, changes)
+            try:
+                for changes in watch(
+                    *paths,
+                    watch_filter=_GitAwareFilter(),
+                    stop_event=_watcher_stop_event,
+                ):
+                    if first:
+                        logger.info(
+                            "[startup] file watchers ready (%.0fms)",
+                            (time.monotonic() - t0) * 1000,
+                        )
+                        _log_inotify_usage("after startup")
+                        first = False
+                    for change, path in changes:
+                        logger.info("[watcher] %s %s", change.name, path)
+                    loop.call_soon_threadsafe(q.put_nowait, changes)
+            except Exception:
+                logger.exception("[watcher] watch() thread crashed — live reload will stop")
             # Signal the async side that the watcher exited
             loop.call_soon_threadsafe(q.put_nowait, None)
 

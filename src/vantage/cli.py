@@ -13,19 +13,24 @@ from vantage.config import DEFAULT_CONFIG_PATH, DaemonConfig, create_example_con
 _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
-def _configure_app_logging() -> None:
-    """Ensure vantage.* loggers emit at INFO level.
+def _configure_app_logging(config_level: str | None = None) -> None:
+    """Ensure vantage.* loggers emit at the configured level.
 
     Uvicorn only configures its own loggers; without this, our
     application-level INFO messages (startup phases, per-repo timing)
     are silently dropped because the root logger defaults to WARNING.
+
+    Precedence: ``VANTAGE_LOG_LEVEL`` env var > ``log_level`` from config
+    file (passed as ``config_level``) > ``INFO`` default.
     """
+    level_name = (os.environ.get("VANTAGE_LOG_LEVEL") or config_level or "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
     vantage_logger = logging.getLogger("vantage")
     if not vantage_logger.handlers:
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter("%(message)s"))
         vantage_logger.addHandler(handler)
-    vantage_logger.setLevel(logging.INFO)
+    vantage_logger.setLevel(level)
 
 
 def _get_version() -> str:
@@ -173,7 +178,7 @@ def daemon(config: str | None, host: list[str] | None, port: int | None):
 
     hosts = [daemon_cfg.host] if isinstance(daemon_cfg.host, str) else daemon_cfg.host
 
-    _configure_app_logging()
+    _configure_app_logging(config_level=daemon_cfg.log_level)
 
     if len(hosts) == 1:
         uvicorn.run(

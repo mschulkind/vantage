@@ -66,6 +66,7 @@ class DaemonConfig:
     walk_max_depth: int | None = None
     walk_timeout: float = 30.0
     disable_whats_new: bool = False
+    log_level: str = "INFO"
 
     @classmethod
     def from_file(cls, config_path: Path | None = None) -> "DaemonConfig":
@@ -106,6 +107,7 @@ class DaemonConfig:
             walk_max_depth=data.get("walk_max_depth"),
             walk_timeout=data.get("walk_timeout", 30.0),
             disable_whats_new=data.get("disable_whats_new", False),
+            log_level=str(data.get("log_level", "INFO")),
         )
 
         if source_dirs:
@@ -223,6 +225,10 @@ def create_example_config(path: Path | None = None) -> Path:
 # Server settings
 host = "127.0.0.1"
 port = 8000
+
+# Log level for vantage.* loggers.  One of: DEBUG, INFO, WARNING, ERROR.
+# Can be overridden at runtime with the VANTAGE_LOG_LEVEL env var.
+# log_level = "INFO"
 
 # Directories to exclude from file listings and recent files.
 # These are filtered out of the sidebar, file picker, and recent files.
