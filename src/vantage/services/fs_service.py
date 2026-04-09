@@ -109,8 +109,12 @@ class FileSystemService:
 
         max_depth = settings.walk_max_depth
         root_depth = str(dir_path).count(os.sep) if max_depth is not None else 0
+
+        def _on_walk_error(err: OSError) -> None:
+            logger.debug("Permission denied / walk error: %s", err)
+
         try:
-            for dirpath, dirnames, filenames in os.walk(dir_path):
+            for dirpath, dirnames, filenames in os.walk(dir_path, onerror=_on_walk_error):
                 if max_depth is not None and dirpath.count(os.sep) - root_depth >= max_depth:
                     dirnames.clear()
                     continue
@@ -171,7 +175,12 @@ class FileSystemService:
         gitignored_names = (
             self._get_gitignored_names(target_dir) if not self.show_gitignored else set()
         )
-        for entry in os.scandir(target_dir):
+        try:
+            scandir_iter = os.scandir(target_dir)
+        except PermissionError:
+            logger.debug("Permission denied listing directory: %s", target_dir)
+            return []
+        for entry in scandir_iter:
             is_symlink = entry.is_symlink()
 
             # For broken symlinks, is_dir() and is_file() both return False.
@@ -319,7 +328,13 @@ class FileSystemService:
             extensions = [".md"]
 
         results: list[str] = []
-        for dirpath, dirnames, filenames in os.walk(self.root_path, followlinks=False):
+
+        def _on_walk_error(err: OSError) -> None:
+            logger.debug("list_all_files: skipping unreadable path: %s", err)
+
+        for dirpath, dirnames, filenames in os.walk(
+            self.root_path, followlinks=False, onerror=_on_walk_error
+        ):
             # Prune excluded directories and optionally hidden directories
             dirnames[:] = [
                 d

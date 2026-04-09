@@ -224,7 +224,11 @@ async def watch_repo():
         t0 = time.monotonic()
         first = True
         try:
-            for changes in watch(target, watch_filter=_GitAwareFilter()):
+            for changes in watch(
+                target,
+                watch_filter=_GitAwareFilter(),
+                ignore_permission_denied=True,
+            ):
                 if first:
                     logger.info(
                         "[startup] file watcher ready (%.0fms)", (time.monotonic() - t0) * 1000
@@ -336,6 +340,7 @@ async def watch_multi_repo():
                     *paths,
                     watch_filter=_GitAwareFilter(),
                     stop_event=_watcher_stop_event,
+                    ignore_permission_denied=True,
                 ):
                     if first:
                         logger.info(

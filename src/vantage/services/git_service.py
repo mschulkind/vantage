@@ -430,7 +430,10 @@ class GitService:
                     continue
         else:
             # No git repo – fall back to filesystem walk
-            for dirpath, dirnames, filenames in os.walk(self.repo_path):
+            def _on_walk_error(err: OSError) -> None:
+                logger.debug("get_recently_changed_files: skipping unreadable path: %s", err)
+
+            for dirpath, dirnames, filenames in os.walk(self.repo_path, onerror=_on_walk_error):
                 dirnames[:] = [
                     d for d in dirnames if not d.startswith(".") and d not in self.exclude_dirs
                 ]
@@ -502,7 +505,14 @@ class GitService:
         """
         child_repos: list[Path] = []
         try:
-            for entry in os.scandir(self.repo_path):
+            scandir_iter = os.scandir(self.repo_path)
+        except PermissionError:
+            logger.debug("Permission denied scanning for child repos: %s", self.repo_path)
+            return child_repos
+        except OSError:
+            return child_repos
+        for entry in scandir_iter:
+            try:
                 if not entry.is_dir(follow_symlinks=False):
                     continue
                 if entry.name.startswith(".") or entry.name in self.exclude_dirs:
@@ -510,8 +520,11 @@ class GitService:
                 git_dir = Path(entry.path) / ".git"
                 if git_dir.exists():
                     child_repos.append(Path(entry.path))
-        except OSError:
-            pass
+            except PermissionError:
+                logger.debug("Permission denied on entry: %s", entry.path)
+                continue
+            except OSError:
+                continue
         return child_repos
 
     def _get_recent_files_from_child_repos(
@@ -549,9 +562,20 @@ class GitService:
                 entry["path"] = prefix + entry["path"]
                 all_results.append(entry)
 
+        def _on_walk_error(err: OSError) -> None:
+            logger.debug("_get_recent_files_from_child_repos: skipping unreadable path: %s", err)
+
         # Collect .md files from top level and non-git subdirectories.
         try:
-            for entry in os.scandir(self.repo_path):
+            top_entries = list(os.scandir(self.repo_path))
+        except PermissionError:
+            logger.debug("Permission denied scanning top-level repo: %s", self.repo_path)
+            top_entries = []
+        except OSError:
+            top_entries = []
+
+        for entry in top_entries:
+            try:
                 if entry.is_symlink():
                     continue  # Skip symlinks in recents
                 if entry.is_file(follow_symlinks=True) and _matches_ext(entry.name):
@@ -575,7 +599,7 @@ class GitService:
                     if entry.name in child_repo_names:
                         continue  # already handled above
                     # Non-git subdirectory — walk for .md files (all untracked)
-                    for dirpath, dirnames, filenames in os.walk(entry.path):
+                    for dirpath, dirnames, filenames in os.walk(entry.path, onerror=_on_walk_error):
                         dirnames[:] = [
                             d
                             for d in dirnames
@@ -604,8 +628,11 @@ class GitService:
                                 )
                             except OSError:
                                 continue
-        except OSError:
-            pass
+            except PermissionError:
+                logger.debug("Permission denied on entry: %s", entry.path)
+                continue
+            except OSError:
+                continue
 
         all_results.sort(key=lambda r: r["date"], reverse=True)
         return all_results[:limit]

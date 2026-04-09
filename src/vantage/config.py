@@ -137,21 +137,30 @@ class DaemonConfig:
 
             try:
                 entries = sorted(source_dir.iterdir())
+            except PermissionError:
+                logger.debug("Permission denied reading source_dir: %s", source_dir)
+                continue
             except OSError:
-                logger.warning("Cannot read source_dir: %s", source_dir)
+                logger.debug("Cannot read source_dir: %s", source_dir)
                 continue
 
             for entry in entries:
-                if not entry.is_dir():
-                    continue
-                if entry.name.startswith("."):
-                    continue
+                try:
+                    if not entry.is_dir():
+                        continue
+                    if entry.name.startswith("."):
+                        continue
 
-                git_marker = entry / ".git"
-                if not git_marker.exists():
-                    continue
+                    git_marker = entry / ".git"
+                    if not git_marker.exists():
+                        continue
 
-                resolved = entry.resolve()
+                    resolved = entry.resolve()
+                except PermissionError:
+                    logger.debug("Permission denied inspecting source_dir entry: %s", entry)
+                    continue
+                except OSError:
+                    continue
                 if resolved in existing_paths:
                     continue
 
