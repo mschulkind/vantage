@@ -154,6 +154,42 @@ code {
 }
 
 /* ──────────────────────────────────────────
+   Heading anchor links (GitHub-style)
+   ────────────────────────────────────────── */
+/* Extend heading hover zone to cover the anchor area */
+.prose :is(h1, h2, h3, h4, h5, h6) {
+  position: relative;
+  padding-left: 1.5em;
+  margin-left: -1.5em;
+}
+.heading-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.5em;
+  text-align: center;
+  color: rgb(59 130 246 / 0.6);
+  text-decoration: none !important;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s;
+  scroll-margin-top: 32px;
+}
+.heading-anchor:hover {
+  color: rgb(59 130 246 / 1);
+  text-decoration: none !important;
+}
+h1:hover > .heading-anchor,
+h2:hover > .heading-anchor,
+h3:hover > .heading-anchor,
+h4:hover > .heading-anchor,
+h5:hover > .heading-anchor,
+h6:hover > .heading-anchor,
+.heading-anchor:focus {
+  opacity: 1;
+}
+
+/* ──────────────────────────────────────────
    Line anchor highlights (#L42, #L42-L50)
    ────────────────────────────────────────── */
 .line-anchor-highlight {

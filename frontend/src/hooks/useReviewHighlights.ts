@@ -298,13 +298,41 @@ function highlightText(
   text: string,
   commentId: string,
 ): HTMLElement | null {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      // Skip text nodes inside existing inline comments to avoid false matches
+      const parent = node.parentElement;
+      if (parent?.closest(`[${INLINE_COMMENT_ATTR}]`)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
   const textNodes: Text[] = [];
   let node: Text | null;
   while ((node = walker.nextNode() as Text | null)) {
     textNodes.push(node);
   }
 
+  // Try exact match first, then whitespace-normalized match
+  const result = tryHighlight(textNodes, text, commentId);
+  if (result) return result;
+
+  // Fallback: normalize whitespace in both the search text and accumulated content
+  const normalizedText = text.replace(/\s+/g, " ").trim();
+  if (normalizedText !== text) {
+    return tryHighlightNormalized(textNodes, normalizedText, commentId);
+  }
+
+  return null;
+}
+
+/** Try exact text match across text nodes and wrap in <mark>. */
+function tryHighlight(
+  textNodes: Text[],
+  text: string,
+  commentId: string,
+): HTMLElement | null {
   let accumulated = "";
   let startIdx = -1;
   let firstMark: HTMLElement | null = null;
@@ -343,6 +371,73 @@ function highlightText(
     if (startIdx === -1) startIdx = i;
   }
   return null;
+}
+
+/**
+ * Whitespace-normalized match: collapse runs of whitespace in both the
+ * accumulated DOM text and the search text, then map matched positions
+ * back to original offsets for highlighting.
+ */
+function tryHighlightNormalized(
+  textNodes: Text[],
+  normalizedText: string,
+  commentId: string,
+): HTMLElement | null {
+  // Build a map from normalized-index to original-index
+  let raw = "";
+  for (const tn of textNodes) {
+    raw += tn.textContent || "";
+  }
+  const normalized: string[] = [];
+  const normToRaw: number[] = [];
+  let inSpace = false;
+  for (let i = 0; i < raw.length; i++) {
+    if (/\s/.test(raw[i])) {
+      if (!inSpace && normalized.length > 0) {
+        normalized.push(" ");
+        normToRaw.push(i);
+        inSpace = true;
+      }
+    } else {
+      normalized.push(raw[i]);
+      normToRaw.push(i);
+      inSpace = false;
+    }
+  }
+  const normStr = normalized.join("");
+  const pos = normStr.indexOf(normalizedText);
+  if (pos === -1) return null;
+
+  // Map back to raw positions
+  const rawStart = normToRaw[pos];
+  const rawEnd = normToRaw[pos + normalizedText.length - 1] + 1;
+
+  // Now highlight the raw range
+  let offset = 0;
+  let firstMark: HTMLElement | null = null;
+  for (const tn of textNodes) {
+    const nodeText = tn.textContent || "";
+    const nodeStart = offset;
+    const nodeEnd = offset + nodeText.length;
+
+    const matchStart = Math.max(rawStart, nodeStart) - nodeStart;
+    const matchEnd = Math.min(rawEnd, nodeEnd) - nodeStart;
+
+    if (matchEnd > matchStart) {
+      const range = document.createRange();
+      range.setStart(tn, matchStart);
+      range.setEnd(tn, matchEnd);
+
+      const mark = document.createElement("mark");
+      mark.setAttribute(MARK_ATTR, commentId);
+      mark.className = "review-highlight";
+      range.surroundContents(mark);
+      if (!firstMark) firstMark = mark;
+    }
+
+    offset += nodeText.length;
+  }
+  return firstMark;
 }
 
 /** Split markdown into paragraph-level blocks for diffing. */

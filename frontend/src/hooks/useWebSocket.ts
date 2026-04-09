@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useRepoStore } from "../stores/useRepoStore";
 import { useGitStore } from "../stores/useGitStore";
+import { useConnectionStore } from "../stores/useConnectionStore";
 import { WebSocketMessage } from "../types";
 import { isStaticMode } from "../lib/staticMode";
 
@@ -229,6 +230,7 @@ export const useWebSocket = () => {
         downtime ? ` — was disconnected for ${downtime}` : " (initial)",
       );
       reconnectAttemptRef.current = 0;
+      useConnectionStore.getState().setConnected(true);
       // Refresh everything since we may have missed changes while disconnected
       refreshAfterReconnect();
     };
@@ -241,6 +243,7 @@ export const useWebSocket = () => {
 
     socket.onclose = (event: CloseEvent) => {
       disconnectedAtRef.current = Date.now();
+      useConnectionStore.getState().setConnected(false);
       console.log(
         "[ws] Closed (#%d): code=%d reason=%s wasClean=%s",
         connectNum,

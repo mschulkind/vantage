@@ -205,6 +205,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     for (const c of active) {
       // Find the selected text in the file to get line numbers
       const loc = findTextLocation(contentLines, c.selected_text);
+      const shortId = c.id.slice(0, 8);
       if (loc) {
         const { startLine, endLine } = loc;
         // Show context: a few lines before and after the selection
@@ -218,7 +219,9 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
           startLine === endLine
             ? `Line ${startLine + 1}`
             : `Lines ${startLine + 1}-${endLine + 1}`;
-        output.push(`### [${label}](${pathPrefix}${anchor})`);
+        output.push(`### [${label}](${pathPrefix}${anchor}) \`[${shortId}]\``);
+        output.push("");
+        output.push(`**Selected text:** "${c.selected_text}"`);
         output.push("");
         output.push("```");
         for (let i = ctxStart; i <= ctxEnd; i++) {
@@ -229,8 +232,9 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         }
         output.push("```");
       } else {
-        // Fallback: just quote the selected text
-        output.push(`> ${c.selected_text.replace(/\n/g, "\n> ")}`);
+        output.push(`### Comment \`[${shortId}]\``);
+        output.push("");
+        output.push(`**Selected text:** "${c.selected_text}"`);
       }
       output.push("");
       output.push(`**Comment:** ${c.comment}`);
@@ -238,6 +242,27 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       output.push("---");
       output.push("");
     }
+
+    // Agent response instructions
+    output.push("## Responding to Comments");
+    output.push("");
+    output.push(
+      "After addressing a comment, append a **changelist entry** to the end of this document with the comment ID:",
+    );
+    output.push("");
+    output.push("```markdown");
+    output.push("<!-- changelog -->");
+    output.push("- [<id>] <brief description of what you changed>");
+    output.push("```");
+    output.push("");
+    output.push(
+      "For example: `- [${active[0]?.id.slice(0, 8)}] Reworded paragraph for clarity`",
+    );
+    output.push("");
+    output.push(
+      "The reviewer will match the `[<id>]` tag to auto-resolve the corresponding comment.",
+    );
+    output.push("");
 
     try {
       await navigator.clipboard.writeText(output.join("\n"));

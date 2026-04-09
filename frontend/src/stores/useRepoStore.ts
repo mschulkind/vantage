@@ -215,6 +215,8 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       currentDirectory: null,
       currentPath: null,
       expandedDirs: {},
+      isLoading: false,
+      error: null,
     });
     // Refresh tree for the new repo
     get().refreshTree();

@@ -273,9 +273,66 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
     return () => el.removeEventListener("mouseup", handler);
   }, [isReviewMode, setPendingSelection, snapshotLabel]);
 
+  // Factory for heading components with hover anchor links
+  const headingWithAnchor = useCallback(
+    (Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6") => {
+      const Component = ({
+        id,
+        children,
+        ...props
+      }: {
+        id?: string;
+        children?: React.ReactNode;
+      } & React.HTMLAttributes<HTMLHeadingElement>) => (
+        <Tag id={id} className="group relative" {...props}>
+          {id && (
+            <a
+              href={`#${id}`}
+              className="heading-anchor"
+              aria-label="Link to this heading"
+              onClick={(e) => {
+                e.preventDefault();
+                // Update URL hash without scrolling
+                window.history.replaceState(null, "", `#${id}`);
+                // Scroll to the heading
+                const el = document.getElementById(id);
+                if (el) {
+                  const scrollContainer =
+                    el.closest("[data-content-scroll]") ||
+                    el.closest(".overflow-y-auto");
+                  if (scrollContainer) {
+                    const offset =
+                      el.getBoundingClientRect().top -
+                      scrollContainer.getBoundingClientRect().top +
+                      scrollContainer.scrollTop;
+                    scrollContainer.scrollTo({ top: offset - 16 });
+                  } else {
+                    el.scrollIntoView();
+                  }
+                }
+              }}
+            >
+              #
+            </a>
+          )}
+          {children}
+        </Tag>
+      );
+      Component.displayName = Tag.toUpperCase();
+      return Component;
+    },
+    [],
+  );
+
   // Memoize markdown components to prevent unnecessary re-renders
   const markdownComponents = useMemo(
     () => ({
+      h1: headingWithAnchor("h1"),
+      h2: headingWithAnchor("h2"),
+      h3: headingWithAnchor("h3"),
+      h4: headingWithAnchor("h4"),
+      h5: headingWithAnchor("h5"),
+      h6: headingWithAnchor("h6"),
       a({
         href,
         children,
@@ -314,7 +371,7 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
         );
       },
     }),
-    [handleLinkClick, resolveHref],
+    [handleLinkClick, resolveHref, headingWithAnchor],
   );
 
   return (
