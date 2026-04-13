@@ -1,4 +1,13 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { MessageSquarePlus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -201,6 +210,45 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
   const deleteComment = useReviewStore((s) => s.deleteComment);
   const resolveComment = useReviewStore((s) => s.resolveComment);
 
+  // Which block is currently being hovered (for the hover-to-comment button).
+  const [hoveredBlock, setHoveredBlock] = useState<HTMLElement | null>(null);
+  const hideHoverTimerRef = useRef<number | null>(null);
+
+  const cancelHideHoverButton = useCallback(() => {
+    if (hideHoverTimerRef.current !== null) {
+      clearTimeout(hideHoverTimerRef.current);
+      hideHoverTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleHideHoverButton = useCallback(() => {
+    cancelHideHoverButton();
+    hideHoverTimerRef.current = window.setTimeout(() => {
+      setHoveredBlock(null);
+      hideHoverTimerRef.current = null;
+    }, 150);
+  }, [cancelHideHoverButton]);
+
+  // Check whether a range/element is inside a changed block of a past
+  // snapshot (commenting on changed text is blocked in snapshot view).
+  const isInChangedBlock = useCallback(
+    (container: HTMLElement, node: Node | Element | null): boolean => {
+      let current = node as Element | null;
+      while (current && current !== container) {
+        if (
+          current.nodeType === Node.ELEMENT_NODE &&
+          current.hasAttribute?.("data-review-changed-block")
+        ) {
+          return true;
+        }
+        const parent: Element | null = current.parentElement;
+        current = parent;
+      }
+      return false;
+    },
+    [],
+  );
+
   const previousSnapshot =
     snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
 
@@ -214,6 +262,47 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
     snapshotLabel,
   );
 
+  // Capture the current window selection (if any) and promote it to a
+  // pending review comment.  Returns true if something was captured.
+  // Shared between mouseup and the "toggle review mode while text already
+  // selected" auto-capture flow.
+  const captureCurrentSelection = useCallback((): boolean => {
+    const el = containerRef.current;
+    if (!el) return false;
+
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+      return false;
+    }
+
+    const text = selection.toString().trim();
+    if (!text || text.length < 3) return false;
+
+    const range = selection.getRangeAt(0);
+    if (
+      !el.contains(range.startContainer) &&
+      !el.contains(range.endContainer)
+    ) {
+      return false;
+    }
+
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return false;
+
+    // When viewing a past snapshot, block commenting on changed blocks.
+    if (snapshotLabel) {
+      const startEl = range.startContainer.parentElement;
+      const endEl = range.endContainer.parentElement;
+      if (isInChangedBlock(el, startEl) || isInChangedBlock(el, endEl)) {
+        showSelectionBlockedToast(rect);
+        return false;
+      }
+    }
+
+    setPendingSelection(text, rect);
+    return true;
+  }, [setPendingSelection, snapshotLabel, isInChangedBlock]);
+
   // Text selection handler for review mode.
   // We listen on the document for mouseup so we catch selections that start
   // inside the container and end outside.  A short delay lets the browser
@@ -226,52 +315,105 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
     const handler = () => {
       // Small delay: the browser sometimes hasn't committed the selection
       // at the instant mouseup fires (especially on fast clicks).
-      setTimeout(() => {
-        const selection = window.getSelection();
-        if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
-          return; // plain click, not a drag-select
-        }
-
-        const text = selection.toString().trim();
-        if (!text || text.length < 3) return;
-
-        // Ensure selection is inside our container
-        const range = selection.getRangeAt(0);
-        if (
-          !el.contains(range.startContainer) &&
-          !el.contains(range.endContainer)
-        ) {
-          return;
-        }
-
-        const rect = range.getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) return; // collapsed rect
-
-        // When viewing a past snapshot, block selection on changed blocks
-        if (snapshotLabel) {
-          const startEl = range.startContainer.parentElement;
-          const endEl = range.endContainer.parentElement;
-          const inChanged = (node: Element | null): boolean => {
-            while (node && node !== el) {
-              if (node.hasAttribute("data-review-changed-block")) return true;
-              node = node.parentElement;
-            }
-            return false;
-          };
-          if (inChanged(startEl) || inChanged(endEl)) {
-            // Show a brief tooltip near the selection
-            showSelectionBlockedToast(rect);
-            return;
-          }
-        }
-
-        setPendingSelection(text, rect);
-      }, 10);
+      setTimeout(() => captureCurrentSelection(), 10);
     };
 
     el.addEventListener("mouseup", handler);
     return () => el.removeEventListener("mouseup", handler);
-  }, [isReviewMode, setPendingSelection, snapshotLabel]);
+  }, [isReviewMode, captureCurrentSelection]);
+
+  // When review mode is turned on while text is already selected, treat
+  // that selection as the user's intended comment target — skips the
+  // "oh I forgot to enable review mode first, now I have to reselect" chore.
+  useEffect(() => {
+    if (!isReviewMode) return;
+    // Small delay so this runs *after* any focus/click that accompanied the
+    // toggle (toolbar button click can otherwise clobber the selection).
+    const id = setTimeout(() => captureCurrentSelection(), 0);
+    return () => clearTimeout(id);
+  }, [isReviewMode, captureCurrentSelection]);
+
+  // Hover-to-comment: track which block the mouse is over so we can render
+  // a floating "comment on this block" button.  Avoids the user having to
+  // drag-select the entire paragraph by hand.
+  useEffect(() => {
+    if (!isReviewMode) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const BLOCK_SELECTOR = "p, h1, h2, h3, h4, h5, h6, li, blockquote";
+
+    const onOver = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      // Ignore hovering over existing inline comment blocks — those are
+      // review UI, not document content.
+      if (target.closest("[data-review-inline-comment]")) return;
+      const block = target.closest(BLOCK_SELECTOR) as HTMLElement | null;
+      if (!block || !el.contains(block)) return;
+      // Skip list items that just wrap nested lists (no direct text).
+      const text = (block.innerText || "").trim();
+      if (text.length < 3) return;
+      cancelHideHoverButton();
+      setHoveredBlock((prev) => (prev === block ? prev : block));
+    };
+
+    el.addEventListener("mouseover", onOver);
+    el.addEventListener("mouseleave", scheduleHideHoverButton);
+    return () => {
+      el.removeEventListener("mouseover", onOver);
+      el.removeEventListener("mouseleave", scheduleHideHoverButton);
+      cancelHideHoverButton();
+      setHoveredBlock(null);
+    };
+  }, [isReviewMode, cancelHideHoverButton, scheduleHideHoverButton]);
+
+  // Click-handler for the hover-to-comment button: synthesize a "selection"
+  // from the block's text and open the comment popover.
+  const handleCommentOnBlock = useCallback(
+    (block: HTMLElement) => {
+      const el = containerRef.current;
+      if (!el) return;
+      // Strip revision badge text if present (inserted at start of block
+      // when viewing a past snapshot).
+      const badge = block.querySelector(".review-revision-badge");
+      let text = block.innerText || block.textContent || "";
+      if (badge) {
+        const badgeText = badge.textContent || "";
+        if (badgeText && text.startsWith(badgeText)) {
+          text = text.slice(badgeText.length);
+        }
+      }
+      text = text.trim();
+      if (text.length < 3) return;
+
+      const rect = block.getBoundingClientRect();
+
+      if (snapshotLabel && isInChangedBlock(el, block)) {
+        showSelectionBlockedToast(rect);
+        return;
+      }
+
+      setPendingSelection(text, rect);
+      setHoveredBlock(null);
+    },
+    [setPendingSelection, snapshotLabel, isInChangedBlock],
+  );
+
+  // Position of the hover-to-comment button (fixed coords, recalculated
+  // every render so it follows scroll/resize via the parent re-render).
+  const hoverButtonPosition = useMemo(() => {
+    if (!hoveredBlock) return null;
+    const rect = hoveredBlock.getBoundingClientRect();
+    // Put the button in the left gutter of the prose column.
+    const BUTTON_SIZE = 24;
+    const GAP = 6;
+    let left = rect.left - BUTTON_SIZE - GAP;
+    // If that would go off-screen, place it inside the block at top-left.
+    if (left < 4) left = rect.left + 4;
+    const top = rect.top + 4;
+    return { top, left };
+  }, [hoveredBlock]);
 
   // Factory for heading components with hover anchor links
   const headingWithAnchor = useCallback(
@@ -443,6 +585,29 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
           onCancel={clearPendingSelection}
         />
       )}
+      {/* Review mode: hover-to-comment button on the current block */}
+      {isReviewMode &&
+        !pendingSelection &&
+        hoveredBlock &&
+        hoverButtonPosition &&
+        createPortal(
+          <button
+            type="button"
+            onMouseEnter={cancelHideHoverButton}
+            onMouseLeave={scheduleHideHoverButton}
+            onClick={() => handleCommentOnBlock(hoveredBlock)}
+            title="Comment on this block"
+            className="review-block-comment-button"
+            style={{
+              position: "fixed",
+              top: hoverButtonPosition.top,
+              left: hoverButtonPosition.left,
+            }}
+          >
+            <MessageSquarePlus size={14} />
+          </button>,
+          document.body,
+        )}
     </div>
   );
 };

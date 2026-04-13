@@ -11,10 +11,19 @@ const BLOCK_ATTR = "data-review-changed-block";
  * into the rendered markdown DOM.  Runs as a side-effect so it doesn't
  * interfere with MarkdownViewer's memoization.
  *
- * When a comment's selected_text no longer appears in the rendered content
- * (i.e. the author changed that section), the comment is shown as an
- * "outdated" block near the best-matching paragraph — similar to GitHub's
- * outdated review comments.
+ * "Outdated" comments: a comment is outdated when its saved `selected_text`
+ * no longer appears anywhere in the rendered document — meaning the author
+ * actually rewrote that section after the comment was made, so we can't
+ * highlight it in place.  Such comments are shown as a muted block near the
+ * best-matching paragraph, labeled "Outdated", similar to GitHub's outdated
+ * review comments.
+ *
+ * If the text IS still present but `highlightText` couldn't pin it down to
+ * a specific `Range` (this happens when the selection spans multiple block
+ * elements, contains mixed inline formatting, or crosses line breaks in
+ * ways that defeat fuzzy text-node matching), we fall back to showing the
+ * comment as a *normal* (non-outdated) block at the best-matching block.
+ * Only genuinely-missing text gets the "Outdated" label.
  */
 export function useReviewHighlights(
   containerRef: RefObject<HTMLDivElement | null>,
@@ -54,12 +63,22 @@ export function useReviewHighlights(
     const active = comments.filter((c) => !c.resolved);
     if (active.length === 0) return;
 
+    // Precompute the normalized rendered text for the "is this text still
+    // present?" fallback check.  We use `innerText` (not `textContent`)
+    // because it reflects what the browser would copy to the clipboard —
+    // including newlines at block boundaries — which matches what
+    // `selection.toString()` captured when the comment was originally made.
+    // `textContent` just concatenates text nodes with no separators and
+    // misses cross-block selections entirely.
+    const renderedText = (el as HTMLElement).innerText || el.textContent || "";
+    const normalizedRendered = renderedText.replace(/\s+/g, " ").trim();
+
     // For each comment: highlight the text, then insert an inline comment block
     // after the containing block-level element.
     for (const comment of active) {
       const mark = highlightText(el, comment.selected_text, comment.id);
       if (mark) {
-        // Text still present — show normal inline comment
+        // Text still present and locatable — show normal inline comment
         insertInlineComment(
           el,
           mark,
@@ -68,13 +87,35 @@ export function useReviewHighlights(
           onResolveComment,
           false,
         );
-      } else {
-        // Text not found — comment is outdated (text was changed).
-        // Find the best-matching block element and insert an outdated comment there.
-        insertOutdatedComment(el, comment, onDeleteComment, onResolveComment);
+        continue;
       }
+
+      // `highlightText` couldn't pin the text down.  Distinguish between
+      // genuinely outdated (text gone from the document) and merely
+      // unlocatable (text still present, but we couldn't match a Range
+      // across inline-formatting or block boundaries).
+      const normalizedSelection = comment.selected_text
+        .replace(/\s+/g, " ")
+        .trim();
+      const stillPresent =
+        normalizedSelection.length > 0 &&
+        normalizedRendered.includes(normalizedSelection);
+
+      insertCommentAtBestBlock(
+        el,
+        comment,
+        onDeleteComment,
+        onResolveComment,
+        /* isOutdated */ !stillPresent,
+      );
     }
-  }, [containerRef, comments, onDeleteComment, onResolveComment]);
+  }, [
+    containerRef,
+    comments,
+    currentContent,
+    onDeleteComment,
+    onResolveComment,
+  ]);
 
   // --- Block-level change highlights ---
   useEffect(() => {
@@ -167,15 +208,22 @@ function insertInlineComment(
 }
 
 /**
- * Insert an outdated comment near the best-matching block in the container.
- * Uses word overlap to find the most similar paragraph to where the comment
- * originally lived.
+ * Insert a comment near the best-matching block in the container.  Used
+ * when `highlightText` couldn't pin the selection down to a precise DOM
+ * range.  Uses word overlap to find the most similar paragraph to where
+ * the comment originally lived.
+ *
+ * Pass `isOutdated=true` if the text has genuinely been removed from the
+ * document (shows the "Outdated" badge + Dismiss button); pass `false` if
+ * the text is still present but we just couldn't match a precise Range
+ * (renders as a normal inline comment at the best block).
  */
-function insertOutdatedComment(
+function insertCommentAtBestBlock(
   container: HTMLElement,
   comment: ReviewComment,
   onDelete: (id: string) => void,
   onResolve: (id: string) => void,
+  isOutdated: boolean,
 ) {
   const blockEls = container.querySelectorAll(
     "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, table",
@@ -203,7 +251,7 @@ function insertOutdatedComment(
     }
   }
 
-  const wrapper = createCommentBlock(comment, onDelete, onResolve, true);
+  const wrapper = createCommentBlock(comment, onDelete, onResolve, isOutdated);
 
   if (bestEl && bestScore > 0.15) {
     // Insert after the best-matching block

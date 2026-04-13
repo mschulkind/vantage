@@ -78,13 +78,20 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     const base = getApiBase();
     if (!base) return;
 
-    if (get().filePath !== filePath) {
+    // Review state is per-file: when switching files, reset the transient
+    // state (comments, snapshots, pending selection, and *review mode
+    // itself*).  The new file's mode is then re-derived below from whether
+    // it has saved review data.  This prevents review mode from bleeding
+    // from one file to another just because it was enabled on the previous.
+    const switchingFile = get().filePath !== filePath;
+    if (switchingFile) {
       set({
         filePath,
         comments: [],
         snapshots: [],
         pendingSelection: null,
         currentSnapshotIndex: null,
+        isReviewMode: false,
       });
     }
 
@@ -99,12 +106,14 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
           comments: data.comments,
           snapshots: data.snapshots,
           filePath: data.file_path,
-          // Auto-enable review mode if there's existing review data
-          ...(hasData ? { isReviewMode: true } : {}),
+          // Auto-enable review mode iff the file has saved review data.
+          // On a fresh file with no data, the user explicitly toggles
+          // review mode on via the toolbar.
+          isReviewMode: hasData,
         });
       }
     } catch {
-      // No review data yet
+      // No review data yet — state was already cleared above if switching
     } finally {
       set({ isLoading: false });
     }
