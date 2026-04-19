@@ -44,6 +44,7 @@ interface ReviewState {
   clearPendingSelection: () => void;
   addComment: (selectedText: string, comment: string) => void;
   deleteComment: (id: string) => void;
+  editComment: (id: string, newComment: string) => void;
   resolveComment: (id: string) => void;
   clearAllComments: () => void;
   addSnapshot: (content: string) => void;
@@ -159,6 +160,15 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   deleteComment: (id: string) => {
     set((s) => ({
       comments: s.comments.filter((c) => c.id !== id),
+    }));
+    get().saveReview();
+  },
+
+  editComment: (id: string, newComment: string) => {
+    set((s) => ({
+      comments: s.comments.map((c) =>
+        c.id === id ? { ...c, comment: newComment } : c,
+      ),
     }));
     get().saveReview();
   },

@@ -208,6 +208,7 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
   const clearPendingSelection = useReviewStore((s) => s.clearPendingSelection);
   const addComment = useReviewStore((s) => s.addComment);
   const deleteComment = useReviewStore((s) => s.deleteComment);
+  const editComment = useReviewStore((s) => s.editComment);
   const resolveComment = useReviewStore((s) => s.resolveComment);
 
   // Which block is currently being hovered (for the hover-to-comment button).
@@ -226,7 +227,7 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
     hideHoverTimerRef.current = window.setTimeout(() => {
       setHoveredBlock(null);
       hideHoverTimerRef.current = null;
-    }, 150);
+    }, 400);
   }, [cancelHideHoverButton]);
 
   // Check whether a range/element is inside a changed block of a past
@@ -259,6 +260,7 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
     isReviewMode ? body : null,
     deleteComment,
     resolveComment,
+    editComment,
     snapshotLabel,
   );
 

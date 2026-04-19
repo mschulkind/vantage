@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Check,
   ClipboardCopy,
   MessageSquare,
+  Pencil,
   Trash2,
   X,
   CheckCircle2,
@@ -21,11 +22,15 @@ export const ReviewPanel: React.FC<ReviewPanelProps> = ({
 }) => {
   const comments = useReviewStore((s) => s.comments);
   const deleteComment = useReviewStore((s) => s.deleteComment);
+  const editComment = useReviewStore((s) => s.editComment);
   const copyAllToClipboard = useReviewStore((s) => s.copyAllToClipboard);
   const deleteReview = useReviewStore((s) => s.deleteReview);
 
   const [copied, setCopied] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const editRef = useRef<HTMLTextAreaElement>(null);
 
   if (!isOpen) return null;
 
@@ -98,17 +103,76 @@ export const ReviewPanel: React.FC<ReviewPanelProps> = ({
                         <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 rounded px-2 py-1 border-l-2 border-blue-400 line-clamp-2 flex-1">
                           {c.selected_text}
                         </div>
-                        <button
-                          onClick={() => deleteComment(c.id)}
-                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 transition-opacity shrink-0"
-                          title="Delete comment"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingId(c.id);
+                              setEditText(c.comment);
+                              setTimeout(() => editRef.current?.focus(), 0);
+                            }}
+                            className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-400 hover:text-blue-500 transition-opacity"
+                            title="Edit comment"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            onClick={() => deleteComment(c.id)}
+                            className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 transition-opacity"
+                            title="Delete comment"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
-                      <p className="mt-1.5 text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
-                        {c.comment}
-                      </p>
+                      {editingId === c.id ? (
+                        <div className="mt-1.5">
+                          <textarea
+                            ref={editRef}
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (
+                                e.key === "Enter" &&
+                                (e.metaKey || e.ctrlKey)
+                              ) {
+                                e.preventDefault();
+                                const trimmed = editText.trim();
+                                if (trimmed && trimmed !== c.comment) {
+                                  editComment(c.id, trimmed);
+                                }
+                                setEditingId(null);
+                              }
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            rows={3}
+                            className="w-full text-sm rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-2 py-1.5 resize-y min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          <div className="flex justify-end gap-1.5 mt-1">
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="px-2 py-1 text-[11px] rounded text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => {
+                                const trimmed = editText.trim();
+                                if (trimmed && trimmed !== c.comment) {
+                                  editComment(c.id, trimmed);
+                                }
+                                setEditingId(null);
+                              }}
+                              className="px-2 py-1 text-[11px] rounded bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="mt-1.5 text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
+                          {c.comment}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -32,6 +32,7 @@ export function useReviewHighlights(
   currentContent: string | null,
   onDeleteComment: (id: string) => void,
   onResolveComment: (id: string) => void,
+  onEditComment: (id: string, newComment: string) => void,
   /** e.g. "1/3" when viewing a past snapshot, null when live */
   snapshotLabel?: string | null,
 ) {
@@ -61,6 +62,13 @@ export function useReviewHighlights(
 
     // Filter out resolved comments
     const active = comments.filter((c) => !c.resolved);
+    const resolved = comments.filter((c) => c.resolved);
+
+    // Show collapsed resolved-comment indicator if any exist
+    if (resolved.length > 0) {
+      insertResolvedIndicator(el, resolved.length);
+    }
+
     if (active.length === 0) return;
 
     // Precompute the normalized rendered text for the "is this text still
@@ -85,6 +93,7 @@ export function useReviewHighlights(
           comment,
           onDeleteComment,
           onResolveComment,
+          onEditComment,
           false,
         );
         continue;
@@ -106,6 +115,7 @@ export function useReviewHighlights(
         comment,
         onDeleteComment,
         onResolveComment,
+        onEditComment,
         /* isOutdated */ !stillPresent,
       );
     }
@@ -115,6 +125,7 @@ export function useReviewHighlights(
     currentContent,
     onDeleteComment,
     onResolveComment,
+    onEditComment,
   ]);
 
   // --- Block-level change highlights ---
@@ -122,12 +133,16 @@ export function useReviewHighlights(
     const el = containerRef.current;
     if (!el) return;
 
-    // Clean previous block highlights and revision badges
+    // Clean previous block highlights, revision badges, and addressed badges
     el.querySelectorAll(`[${BLOCK_ATTR}]`).forEach((node) => {
       (node as HTMLElement).removeAttribute(BLOCK_ATTR);
-      (node as HTMLElement).classList.remove("review-changed-block");
+      (node as HTMLElement).classList.remove(
+        "review-changed-block",
+        "review-addressed-block",
+      );
     });
     el.querySelectorAll(".review-revision-badge").forEach((n) => n.remove());
+    el.querySelectorAll(".review-addressed-badge").forEach((n) => n.remove());
 
     if (!previousSnapshot || !currentContent) return;
 
@@ -136,6 +151,14 @@ export function useReviewHighlights(
     const changedTexts = findChangedBlocks(oldBlocks, newBlocks);
 
     if (changedTexts.size === 0) return;
+
+    // Build a set of resolved comments' selected text (normalized) for
+    // the "addressed" connection — if a changed block overlaps with a
+    // resolved comment's text, it likely addressed that comment.
+    const resolved = comments.filter((c) => c.resolved);
+    const resolvedTexts = resolved.map((c) =>
+      c.selected_text.replace(/\s+/g, " ").trim().toLowerCase(),
+    );
 
     const blockEls = el.querySelectorAll(
       "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, table",
@@ -146,18 +169,39 @@ export function useReviewHighlights(
         (blockEl as HTMLElement).setAttribute(BLOCK_ATTR, "true");
         (blockEl as HTMLElement).classList.add("review-changed-block");
 
-        // Add revision badge if viewing a past snapshot
-        if (snapshotLabel) {
+        // Check if this changed block addressed a resolved comment.
+        // We check: did any old block that CHANGED contain a resolved
+        // comment's selected text? If so, this new block "addressed" it.
+        const oldBlocksForPos = findOldBlocksForChanged(
+          oldBlocks,
+          newBlocks,
+          blockText,
+        );
+        const addressed = resolvedTexts.some((rt: string) =>
+          oldBlocksForPos.some(
+            (ob: string) =>
+              ob.toLowerCase().includes(rt) || rt.includes(ob.toLowerCase()),
+          ),
+        );
+
+        if (addressed) {
+          (blockEl as HTMLElement).classList.add("review-addressed-block");
+          const badge = document.createElement("span");
+          badge.className = "review-addressed-badge";
+          badge.textContent = "\u2713 addressed";
+          (blockEl as HTMLElement).style.position = "relative";
+          blockEl.insertBefore(badge, blockEl.firstChild);
+        } else if (snapshotLabel) {
+          // Add revision badge if viewing a past snapshot
           const badge = document.createElement("span");
           badge.className = "review-revision-badge";
           badge.textContent = snapshotLabel;
-          // Insert at the start of the block so it floats top-right via CSS
           (blockEl as HTMLElement).style.position = "relative";
           blockEl.insertBefore(badge, blockEl.firstChild);
         }
       }
     }
-  }, [containerRef, previousSnapshot, currentContent, snapshotLabel]);
+  }, [containerRef, previousSnapshot, currentContent, snapshotLabel, comments]);
 }
 
 /**
@@ -192,12 +236,19 @@ function insertInlineComment(
   comment: ReviewComment,
   onDelete: (id: string) => void,
   onResolve: (id: string) => void,
+  onEdit: (id: string, newComment: string) => void,
   isOutdated: boolean,
 ) {
   const blockEl = findBlockAncestor(container, anchorEl);
   if (!blockEl) return;
 
-  const wrapper = createCommentBlock(comment, onDelete, onResolve, isOutdated);
+  const wrapper = createCommentBlock(
+    comment,
+    onDelete,
+    onResolve,
+    onEdit,
+    isOutdated,
+  );
 
   // Insert after the block element
   if (blockEl.nextSibling) {
@@ -223,6 +274,7 @@ function insertCommentAtBestBlock(
   comment: ReviewComment,
   onDelete: (id: string) => void,
   onResolve: (id: string) => void,
+  onEdit: (id: string, newComment: string) => void,
   isOutdated: boolean,
 ) {
   const blockEls = container.querySelectorAll(
@@ -251,7 +303,13 @@ function insertCommentAtBestBlock(
     }
   }
 
-  const wrapper = createCommentBlock(comment, onDelete, onResolve, isOutdated);
+  const wrapper = createCommentBlock(
+    comment,
+    onDelete,
+    onResolve,
+    onEdit,
+    isOutdated,
+  );
 
   if (bestEl && bestScore > 0.15) {
     // Insert after the best-matching block
@@ -275,6 +333,7 @@ function createCommentBlock(
   comment: ReviewComment,
   onDelete: (id: string) => void,
   onResolve: (id: string) => void,
+  onEdit: (id: string, newComment: string) => void,
   isOutdated: boolean,
 ): HTMLElement {
   const wrapper = document.createElement("div");
@@ -294,6 +353,7 @@ function createCommentBlock(
         </div>
         <div class="review-inline-comment-actions">
           <button class="review-inline-comment-resolve" title="Dismiss comment">Dismiss</button>
+          <button class="review-inline-comment-edit" title="Edit comment">&#x270E;</button>
           <button class="review-inline-comment-delete" title="Delete comment">&times;</button>
         </div>
       </div>
@@ -307,6 +367,7 @@ function createCommentBlock(
       <div class="review-inline-comment-body">
         <span class="review-inline-comment-icon" title="Review comment">&#x1f4ac;</span>
         <div class="review-inline-comment-text"></div>
+        <button class="review-inline-comment-edit" title="Edit comment">&#x270E;</button>
         <button class="review-inline-comment-delete" title="Delete comment">&times;</button>
       </div>
     `;
@@ -315,6 +376,73 @@ function createCommentBlock(
   // Set comment text safely (no innerHTML for user content)
   const textEl = wrapper.querySelector(".review-inline-comment-text");
   if (textEl) textEl.textContent = comment.comment;
+
+  // Wire up edit button — replaces text with a textarea inline
+  const editBtn = wrapper.querySelector(".review-inline-comment-edit");
+  if (editBtn && textEl) {
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Already editing?
+      if (wrapper.querySelector(".review-inline-edit-area")) return;
+
+      const currentText = comment.comment;
+      const textarea = document.createElement("textarea");
+      textarea.className = "review-inline-edit-area";
+      textarea.value = currentText;
+      textarea.rows = 3;
+
+      const btnRow = document.createElement("div");
+      btnRow.className = "review-inline-edit-buttons";
+
+      const saveBtn = document.createElement("button");
+      saveBtn.textContent = "Save";
+      saveBtn.className = "review-inline-edit-save";
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.className = "review-inline-edit-cancel";
+
+      btnRow.appendChild(cancelBtn);
+      btnRow.appendChild(saveBtn);
+
+      // Hide existing text, show editor
+      (textEl as HTMLElement).style.display = "none";
+      textEl.parentNode!.insertBefore(textarea, textEl.nextSibling);
+      textEl.parentNode!.insertBefore(btnRow, textarea.nextSibling);
+      textarea.focus();
+
+      const cleanup = () => {
+        textarea.remove();
+        btnRow.remove();
+        (textEl as HTMLElement).style.display = "";
+      };
+
+      saveBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const newText = textarea.value.trim();
+        if (newText && newText !== currentText) {
+          onEdit(comment.id, newText);
+        }
+        cleanup();
+      });
+
+      cancelBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        cleanup();
+      });
+
+      textarea.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {
+          ev.preventDefault();
+          saveBtn.click();
+        }
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          cancelBtn.click();
+        }
+      });
+    });
+  }
 
   // Wire up delete button
   const deleteBtn = wrapper.querySelector(".review-inline-comment-delete");
@@ -335,6 +463,48 @@ function createCommentBlock(
   }
 
   return wrapper;
+}
+
+/** Insert a collapsed indicator showing how many resolved comments are hidden. */
+function insertResolvedIndicator(container: HTMLElement, count: number) {
+  const existing = container.querySelector(".review-resolved-indicator");
+  if (existing) existing.remove();
+
+  const bar = document.createElement("div");
+  bar.className = "review-resolved-indicator";
+  bar.setAttribute(INLINE_COMMENT_ATTR, "__resolved__");
+  bar.innerHTML = `
+    <span class="review-resolved-indicator-icon">\u2713</span>
+    <span class="review-resolved-indicator-text">${count} resolved comment${count !== 1 ? "s" : ""}</span>
+  `;
+
+  // Insert at the top of the container
+  if (container.firstChild) {
+    container.insertBefore(bar, container.firstChild);
+  } else {
+    container.appendChild(bar);
+  }
+}
+
+/**
+ * Find old blocks that correspond to a changed new block, by matching
+ * position in the block diff.  Returns the stripped old block texts.
+ */
+function findOldBlocksForChanged(
+  oldBlocks: string[],
+  newBlocks: string[],
+  newBlockText: string,
+): string[] {
+  const results: string[] = [];
+  const maxLen = Math.max(oldBlocks.length, newBlocks.length);
+  for (let i = 0; i < maxLen; i++) {
+    const oldB = oldBlocks[i] || "";
+    const newB = newBlocks[i] || "";
+    if (oldB !== newB && newB && stripMarkdown(newB) === newBlockText) {
+      results.push(stripMarkdown(oldB));
+    }
+  }
+  return results;
 }
 
 /**
