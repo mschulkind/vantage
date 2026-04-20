@@ -515,7 +515,13 @@ h6:hover > .heading-anchor,
 .review-block-comment-button::before {
   content: "";
   position: absolute;
-  inset: -12px -20px -12px -12px; /* generous pad: 12px all sides, 20px right toward text */
+  /* Top/bottom are driven by inline vars so the hit zone matches the
+     hovered block's full height — the user can travel leftward from any
+     line in the block and stay in the hover zone. */
+  top: var(--hit-top, -12px);
+  bottom: var(--hit-bottom, -12px);
+  left: -12px;
+  right: -20px; /* extend 20px right, toward the block text */
 }
 .review-block-comment-button:hover {
   opacity: 1;

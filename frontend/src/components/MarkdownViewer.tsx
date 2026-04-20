@@ -414,7 +414,15 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
     // If that would go off-screen, place it inside the block at top-left.
     if (left < 4) left = rect.left + 4;
     const top = rect.top + 4;
-    return { top, left };
+    // Extend the button's invisible hit zone (via ::before) to cover the full
+    // block height so users can travel left from any line in the block to the
+    // gutter button without the hover state being lost.
+    const hitZoneTopExtend = 12; // extra padding above button
+    const hitZoneBottomExtend = Math.max(
+      12,
+      rect.height - (top - rect.top) - 4,
+    );
+    return { top, left, hitZoneTopExtend, hitZoneBottomExtend };
   }, [hoveredBlock]);
 
   // Factory for heading components with hover anchor links
@@ -600,11 +608,15 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
             onClick={() => handleCommentOnBlock(hoveredBlock)}
             title="Comment on this block"
             className="review-block-comment-button"
-            style={{
-              position: "fixed",
-              top: hoverButtonPosition.top,
-              left: hoverButtonPosition.left,
-            }}
+            style={
+              {
+                position: "fixed",
+                top: hoverButtonPosition.top,
+                left: hoverButtonPosition.left,
+                "--hit-top": `-${hoverButtonPosition.hitZoneTopExtend}px`,
+                "--hit-bottom": `-${hoverButtonPosition.hitZoneBottomExtend}px`,
+              } as React.CSSProperties
+            }
           >
             <MessageSquarePlus size={14} />
           </button>,
