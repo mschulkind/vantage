@@ -12,6 +12,38 @@ const getApiBase = (): string | null => {
   return "/api";
 };
 
+// Per-file review-mode toggle is persisted to localStorage so refreshing a
+// file where the user has turned review mode ON but hasn't added any
+// comments yet doesn't silently drop the toggle.  (Files with saved
+// comments/snapshots auto-enable review mode from server data.)
+const REVIEW_MODE_KEY_PREFIX = "vantage.reviewMode:";
+
+const reviewModeKey = (filePath: string): string => {
+  const { currentRepo, isMultiRepo } = useRepoStore.getState();
+  const prefix = isMultiRepo && currentRepo ? `${currentRepo}:` : "";
+  return `${REVIEW_MODE_KEY_PREFIX}${prefix}${filePath}`;
+};
+
+const readReviewModePref = (filePath: string): boolean => {
+  try {
+    return localStorage.getItem(reviewModeKey(filePath)) === "on";
+  } catch {
+    return false;
+  }
+};
+
+const writeReviewModePref = (filePath: string, on: boolean): void => {
+  try {
+    if (on) {
+      localStorage.setItem(reviewModeKey(filePath), "on");
+    } else {
+      localStorage.removeItem(reviewModeKey(filePath));
+    }
+  } catch {
+    // storage quota / privacy mode — persistence is best-effort
+  }
+};
+
 interface PendingSelection {
   text: string;
   rect: DOMRect;
@@ -69,10 +101,11 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   isLoading: false,
 
   toggleReviewMode: () => {
-    set((s) => ({
-      isReviewMode: !s.isReviewMode,
-      pendingSelection: null,
-    }));
+    set((s) => {
+      const next = !s.isReviewMode;
+      if (s.filePath) writeReviewModePref(s.filePath, next);
+      return { isReviewMode: next, pendingSelection: null };
+    });
   },
 
   loadReview: async (filePath: string) => {
@@ -101,20 +134,30 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       const { data } = await axios.get<ReviewData | null>(`${base}/review`, {
         params: { path: filePath },
       });
+      const persistedOn = readReviewModePref(filePath);
       if (data) {
         const hasData = data.comments.length > 0 || data.snapshots.length > 0;
         set({
           comments: data.comments,
           snapshots: data.snapshots,
           filePath: data.file_path,
-          // Auto-enable review mode iff the file has saved review data.
-          // On a fresh file with no data, the user explicitly toggles
-          // review mode on via the toolbar.
-          isReviewMode: hasData,
+          // Auto-enable review mode if the file has saved review data OR if
+          // the user explicitly toggled it on for this file (persisted in
+          // localStorage).  Without the persistence, refreshing a fresh
+          // file where review mode was turned on but no comments exist
+          // would silently revert to off.
+          isReviewMode: hasData || persistedOn,
         });
+      } else if (persistedOn) {
+        // Server has nothing, but the user had toggled review mode on
+        // before the refresh — honor that preference.
+        set({ isReviewMode: true });
       }
     } catch {
-      // No review data yet — state was already cleared above if switching
+      // No review data yet — still honor the persisted toggle if present.
+      if (readReviewModePref(filePath)) {
+        set({ isReviewMode: true });
+      }
     } finally {
       set({ isLoading: false });
     }
@@ -320,6 +363,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       } catch {
         // ignore
       }
+      writeReviewModePref(filePath, false);
     }
 
     set({

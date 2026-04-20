@@ -224,10 +224,15 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
 
   const scheduleHideHoverButton = useCallback(() => {
     cancelHideHoverButton();
+    // Long delay — the user may pause mid-travel while moving from the
+    // paragraph toward the gutter button.  The hit-zone ::before bridges
+    // the visual gap but a pause still ends the timer; 1500ms is lenient
+    // enough that a deliberate mouse pause doesn't lose the button, while
+    // still hiding it promptly when the user has actually moved away.
     hideHoverTimerRef.current = window.setTimeout(() => {
       setHoveredBlock(null);
       hideHoverTimerRef.current = null;
-    }, 400);
+    }, 1500);
   }, [cancelHideHoverButton]);
 
   // Check whether a range/element is inside a changed block of a past
@@ -548,8 +553,11 @@ const MarkdownViewerInner: React.FC<MarkdownViewerProps> = ({
         // Code blocks: GitHub-like light gray / dark background
         "prose-pre:bg-slate-50 dark:prose-pre:bg-slate-800 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:p-4 prose-pre:rounded-md prose-pre:text-[85%] prose-pre:leading-[1.45]",
 
-        // Links: Standard blue
-        "prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline",
+        // Links: Standard blue. Note: `prose-a:hover:underline` (link-hover),
+        // NOT `hover:prose-a:underline` (prose-hover) — the latter underlines
+        // every link in the document whenever the user hovers anywhere in the
+        // prose container, which looks like accidental multi-link merging.
+        "prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline prose-a:hover:underline",
 
         // Images
         "prose-img:rounded-lg prose-img:my-4",
