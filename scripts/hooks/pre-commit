@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs the full CI quality gate before every commit.
+# Installed via `just install-hooks`.
+just check-ci

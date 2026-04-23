@@ -10,7 +10,7 @@ default:
     @just --list
 
 # Setup the entire project (never modifies tracked files)
-setup:
+setup: install-hooks
     #!/usr/bin/env bash
     set -euo pipefail
     # Create a relocatable venv so shebangs use #!/usr/bin/env python
@@ -22,6 +22,17 @@ setup:
     uv sync --frozen
     cd packages/vantage-md && npm ci && npx tsup && cd ../..
     cd frontend && npm ci
+
+# Install the git hooks tracked at scripts/hooks/ into .git/hooks/.
+# Idempotent — safe to run on every setup.
+install-hooks:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    hooks_dir="$(git rev-parse --git-path hooks)"
+    for hook in pre-commit commit-msg pre-push; do
+        install -m 0755 "scripts/hooks/${hook}" "${hooks_dir}/${hook}"
+    done
+    echo "Installed hooks: pre-commit, commit-msg, pre-push"
 
 # Run the backend server in development mode
 dev-py path=".":
@@ -79,6 +90,29 @@ check: format lint typecheck test build-frontend
 
 # Read-only verification (used by pre-commit hook and CI)
 check-ci: lint-ci typecheck test
+
+# Verify the repo is in a clean, reportable state at the end of a task.
+done:
+    @echo "== branch =="
+    @current=$(git symbolic-ref --short HEAD); \
+     if [ "$current" != "main" ]; then \
+         echo "FAIL: on branch '$current', expected 'main'"; exit 1; \
+     else echo "OK: on main"; fi
+    @echo "== working tree =="
+    @if [ -n "$(git status --porcelain)" ]; then \
+         echo "FAIL: working tree is not clean:"; \
+         git status --short; exit 1; \
+     else echo "OK: clean"; fi
+    @echo "== ahead of origin =="
+    @ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0); \
+     if [ "$ahead" -gt 0 ]; then \
+         echo "WARN: $ahead unpushed commits on main"; \
+         git log --oneline @{u}..HEAD; \
+     else echo "OK: in sync with origin"; fi
+    @echo "== quality gate =="
+    @just check-ci
+    @echo ""
+    @echo "done: ready to report task complete."
 
 lint-ci: lint-py lint-js
     uv run ruff format --check .
