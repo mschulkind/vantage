@@ -35,10 +35,53 @@ def _configure_app_logging(config_level: str | None = None) -> None:
 
 def _get_version() -> str:
     """Get the installed package version."""
-    try:
-        return pkg_version("vantage")
-    except Exception:
-        return "unknown"
+    for dist_name in ("vantage-md", "vantage"):
+        try:
+            return pkg_version(dist_name)
+        except Exception:
+            continue
+    return "unknown"
+
+
+def _resolve_target(repo_path: str | None) -> tuple[str | None, str]:
+    """Resolve a user-supplied path to (repo_root, url_path).
+
+    Accepts either a directory (served as-is) or a Markdown file (its parent
+    becomes the repo root, and the URL path points at the file so the browser
+    lands on it and the sidebar auto-expands to its parent).
+    """
+    if repo_path is None:
+        return None, ""
+    p = Path(repo_path).resolve()
+    if p.is_file():
+        return str(p.parent), p.name
+    return str(p), ""
+
+
+def _open_browser_when_ready(url: str, host: str, port: int, timeout: float = 15.0) -> None:
+    """Open the default browser once the server accepts TCP connections.
+
+    Runs in a background daemon thread. 0.0.0.0 / :: bind addresses are
+    probed via 127.0.0.1 since that's what the browser will connect to.
+    """
+    import socket
+    import threading
+    import time
+    import webbrowser
+
+    probe_host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
+
+    def worker() -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                with socket.create_connection((probe_host, port), timeout=0.5):
+                    webbrowser.open(url)
+                    return
+            except OSError:
+                time.sleep(0.1)
+
+    threading.Thread(target=worker, daemon=True).start()
 
 
 def _warn_nonlocal(host: str | list[str]) -> None:
@@ -54,8 +97,21 @@ def _warn_nonlocal(host: str | list[str]) -> None:
         )
 
 
-@click.group(invoke_without_command=True)
-@click.version_option(version=_get_version(), prog_name="vantage")
+class _ServeByDefaultGroup(click.Group):
+    """Route bare positional args (e.g. a path) to the `serve` subcommand.
+
+    Without this, `vantage-md ~/notes` would fail with "No such command".
+    If the first argument isn't a known subcommand, we prepend `serve`.
+    """
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if args and args[0] not in self.commands and not args[0].startswith("-"):
+            args = ["serve", *args]
+        return super().parse_args(ctx, args)
+
+
+@click.group(cls=_ServeByDefaultGroup, invoke_without_command=True)
+@click.version_option(version=_get_version(), prog_name="vantage-md")
 @click.pass_context
 def cli(ctx: click.Context):
     """Vantage: View LLM-generated Markdown files with GitHub-like rendering."""
@@ -65,16 +121,35 @@ def cli(ctx: click.Context):
 
 @cli.command()
 @click.argument(
-    "repo_path", type=click.Path(exists=True, file_okay=False, dir_okay=True), required=False
+    "repo_path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=True),
+    required=False,
 )
 @click.option("--host", help="Server host")
 @click.option("--port", type=int, help="Server port")
 @click.option("--show-hidden/--no-show-hidden", default=None, help="Show hidden files/directories")
-def serve(repo_path: str | None, host: str | None, port: int | None, show_hidden: bool | None):
-    """Start the Vantage development server (default command)."""
-    # Set environment variables only if arguments are provided
-    if repo_path:
-        os.environ["TARGET_REPO"] = str(Path(repo_path).resolve())
+@click.option(
+    "--open/--no-open",
+    "open_browser",
+    default=True,
+    help="Open the default browser when the server is ready",
+)
+def serve(
+    repo_path: str | None,
+    host: str | None,
+    port: int | None,
+    show_hidden: bool | None,
+    open_browser: bool,
+):
+    """Start the Vantage development server (default command).
+
+    REPO_PATH may be a directory (served as the repo root) or a single
+    Markdown file (its parent becomes the repo root and the browser lands
+    directly on the file).
+    """
+    target_repo, url_path = _resolve_target(repo_path)
+    if target_repo:
+        os.environ["TARGET_REPO"] = target_repo
     if host:
         os.environ["HOST"] = host
     if port:
@@ -96,6 +171,12 @@ def serve(repo_path: str | None, host: str | None, port: int | None, show_hidden
     run_host = (
         final_settings.host if isinstance(final_settings.host, str) else final_settings.host[0]
     )
+
+    if open_browser:
+        browser_host = "127.0.0.1" if run_host in {"0.0.0.0", "::", ""} else run_host
+        url = f"http://{browser_host}:{final_settings.port}/{url_path}"
+        _open_browser_when_ready(url, run_host, final_settings.port)
+
     uvicorn.run("vantage.main:app", host=run_host, port=final_settings.port, reload=True)
 
 
@@ -237,21 +318,30 @@ def init_config(path: str | None, force: bool):
 @cli.command("install-service")
 @click.option("--user", is_flag=True, default=True, help="Install as user service (default)")
 def install_service(user: bool):  # noqa: ARG001
-    """Install Vantage as a systemd user service."""
+    """Install Vantage as a systemd user service (Linux only)."""
     import shutil
     import subprocess
+
+    if sys.platform != "linux":
+        click.echo(
+            f"install-service is systemd-specific and only supported on Linux "
+            f"(detected: {sys.platform}). "
+            "On macOS, run `vantage-md` directly or set up a launchd agent manually.",
+            err=True,
+        )
+        sys.exit(1)
 
     service_dir = Path("~/.config/systemd/user").expanduser()
     service_dir.mkdir(parents=True, exist_ok=True)
     service_file = service_dir / "vantage.service"
 
-    # Find the vantage executable
-    vantage_path = shutil.which("vantage")
+    # Find the vantage executable (prefer the primary `vantage-md` name).
+    vantage_path = shutil.which("vantage-md") or shutil.which("vantage")
     if not vantage_path:
         # Try to find it via uv
         try:
             result = subprocess.run(
-                ["uv", "tool", "run", "--from", "vantage", "which", "vantage"],
+                ["uv", "tool", "run", "--from", "vantage-md", "which", "vantage-md"],
                 capture_output=True,
                 text=True,
             )
@@ -262,7 +352,7 @@ def install_service(user: bool):  # noqa: ARG001
 
     if not vantage_path:
         click.echo("Could not find vantage executable.", err=True)
-        click.echo("Install it first with: uv tool install vantage", err=True)
+        click.echo("Install it first with: uv tool install vantage-md", err=True)
         sys.exit(1)
 
     service_content = f"""\

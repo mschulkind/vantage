@@ -591,8 +591,7 @@ wheels = [
 ]
 
 [[package]]
-name = "vantage"
-version = "0.3.8"
+name = "vantage-md"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

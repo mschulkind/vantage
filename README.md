@@ -12,7 +12,43 @@ Vantage renders your Markdown files the way GitHub does — locally, instantly, 
 
 Built for developers who write docs alongside code — especially useful for reviewing LLM-generated Markdown output in real time.
 
-> **Platform:** Linux. macOS is untested and unsupported. Windows is not supported.
+> **Platform:** Linux and macOS are fully supported. Windows is not supported.
+
+---
+
+## Install
+
+The fastest way to try Vantage — no install, just run:
+
+```bash
+uvx vantage-md ~/Documents/notes          # open a directory
+uvx vantage-md ~/Documents/notes/intro.md # open a specific file
+```
+
+The server starts, your default browser opens to the file (or directory root), and the sidebar focuses on the parent directory of what you opened.
+
+### Homebrew (recommended)
+
+```bash
+brew install mschulkind-oss/tap/vantage-md
+```
+
+### pipx / uvx
+
+```bash
+pipx install vantage-md    # or: uvx vantage-md <path>
+```
+
+### From source
+
+```bash
+git clone https://github.com/mschulkind-oss/vantage
+cd vantage
+mise install               # installs Python 3.13, Node 22, just
+just install               # or: just deploy (with systemd service, Linux only)
+```
+
+Both `vantage-md` and the shorter alias `vantage` are installed and do the same thing.
 
 ---
 
@@ -30,32 +66,7 @@ Built for developers who write docs alongside code — especially useful for rev
 - **Dark Mode** — Toggle with Shift+D, persisted across sessions
 - **Keyboard Shortcuts** — Quick file picker with `t`, fuzzy search, keyboard navigation
 - **Performance Diagnostics** — Built-in `perf-report` command for anonymized timing data
-- **systemd Service** — Run as a background service that starts on login
-
----
-
-## 📦 Installation
-
-Vantage requires **Python 3.13+** and is installed as a CLI tool using [uv](https://docs.astral.sh/uv/).
-
-```bash
-# Install from source
-git clone https://github.com/mschulkind-oss/vantage.git
-cd vantage
-
-# Build and install (includes the frontend)
-just install
-```
-
-This makes the `vantage` command available in your PATH (typically `~/.local/bin/vantage`).
-
-### Prerequisites
-
-| Tool                               | Purpose                                 |
-| ---------------------------------- | --------------------------------------- |
-| [uv](https://docs.astral.sh/uv/)   | Python package manager                  |
-| [Node.js 22+](https://nodejs.org/) | Building the frontend                   |
-| [just](https://just.systems/)      | Command runner (optional, for building) |
+- **systemd Service** (Linux) — Run as a background service that starts on login
 
 ---
 
@@ -63,13 +74,14 @@ This makes the `vantage` command available in your PATH (typically `~/.local/bin
 
 ### Single Directory
 
-Point Vantage at any directory containing Markdown files:
+Point Vantage at any directory containing Markdown files — or a specific file:
 
 ```bash
-vantage serve ~/Documents/notes
+vantage-md ~/Documents/notes
+vantage-md ~/Documents/notes/intro.md
 ```
 
-Open **http://localhost:8000** in your browser.
+Your default browser opens automatically. Pass `--no-open` to suppress.
 
 ### Multiple Directories (Daemon Mode)
 
@@ -77,13 +89,13 @@ To serve several directories at once, create a config and run the daemon:
 
 ```bash
 # Generate a config file
-vantage init-config
+vantage-md init-config
 
 # Edit it
 $EDITOR ~/.config/vantage/config.toml
 
 # Start the daemon
-vantage daemon
+vantage-md daemon
 ```
 
 ---
@@ -149,12 +161,12 @@ exclude_dirs = ["node_modules", ".venv", "vendor", "dist"]
 
 ## 🔧 Service Management (Linux)
 
-Vantage can run as a systemd user service that starts automatically on login.
+On Linux, Vantage can run as a systemd user service that starts automatically on login. On macOS, run `vantage-md` directly or wrap it in a `launchd` agent yourself.
 
 ### Install the Service
 
 ```bash
-vantage install-service
+vantage-md install-service
 ```
 
 ### Enable and Start
@@ -193,15 +205,17 @@ loginctl enable-linger $USER
 
 ## 🖥️ CLI Reference
 
+The primary command is `vantage-md`; `vantage` is kept as a shorter alias.
+
 ```
-vantage                          # Start server (alias for 'serve .')
-vantage serve [PATH]             # Serve a single directory
-vantage daemon                   # Serve multiple directories from config
-vantage daemon -c /path/to.toml  # Use a custom config file
-vantage init-config              # Generate example config file
-vantage install-service          # Install systemd user service
-vantage build PATH -o OUTPUT     # Build a static site
-vantage perf-report              # Performance diagnostics from a running instance
+vantage-md [PATH]                   # Serve a dir or file, auto-open browser
+vantage-md serve [PATH] [--no-open] # Same as above; --no-open disables browser
+vantage-md daemon                   # Serve multiple directories from config
+vantage-md daemon -c /path/to.toml  # Use a custom config file
+vantage-md init-config              # Generate example config file
+vantage-md install-service          # Install systemd user service (Linux only)
+vantage-md build PATH -o OUTPUT     # Build a static site
+vantage-md perf-report              # Performance diagnostics from a running instance
 ```
 
 ---

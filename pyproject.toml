@@ -1,12 +1,18 @@
+[build-system]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
 [tool.uv]
 package = true
 
 [project]
-name = "vantage"
-version = "0.3.8"
+name = "vantage-md"
+dynamic = ["version"]
 description = "A beautiful local Markdown viewer with live reload and Git awareness"
 readme = "README.md"
 requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "click>=8.3.1",
     "fastapi>=0.128.0",
@@ -19,8 +25,19 @@ dependencies = [
     "watchfiles>=1.1.1",
 ]
 
+[project.urls]
+Homepage = "https://vantageapp.dev"
+Repository = "https://github.com/mschulkind-oss/vantage"
+Issues = "https://github.com/mschulkind-oss/vantage/issues"
+
 [project.scripts]
+vantage-md = "vantage.cli:main"
 vantage = "vantage.cli:main"
+
+[tool.setuptools_scm]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
 vantage = ["frontend_dist/**/*"]

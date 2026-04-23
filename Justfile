@@ -151,50 +151,10 @@ _ensure-env:
     fi
 
 # Build the Python package (includes frontend)
-# Never modifies tracked files — patches version in a temp copy of pyproject.toml.
+# Version is derived automatically from git tags by setuptools-scm.
 build: _ensure-env bundle-frontend
-    #!/usr/bin/env bash
-    set -euo pipefail
     rm -rf dist/
-
-    # Compute version: use base version from pyproject.toml, append git metadata
-    base_version=$(python3 -c "
-    import tomllib
-    with open('pyproject.toml', 'rb') as f:
-        print(tomllib.load(f)['project']['version'])
-    ")
-
-    # Check if current commit is a clean tagged release
-    current_tag=$(git tag --points-at HEAD 2>/dev/null | grep "^v" | head -1 || true)
-    is_dirty=$(git diff --quiet 2>/dev/null && echo "false" || echo "true")
-
-    if [[ -n "$current_tag" && "$is_dirty" == "false" ]]; then
-        # Clean tagged release — use version as-is
-        build_version="$base_version"
-    else
-        # Dev build — append git hash and optional dirty flag
-        short_hash=$(git rev-parse --short=8 HEAD 2>/dev/null || echo "unknown")
-        build_version="${base_version}.dev0+g${short_hash}"
-        if [[ "$is_dirty" == "true" ]]; then
-            build_version="${build_version}.dirty"
-        fi
-    fi
-
-    echo "Building version: $build_version"
-
-    # Temporarily patch pyproject.toml for the build, with robust restore.
-    # Save original, patch in-place, build, then always restore from backup.
-    cp pyproject.toml pyproject.toml.bak
-    restore() { mv -f pyproject.toml.bak pyproject.toml; }
-    trap restore EXIT
-    python3 -c "
-    import re, pathlib
-    p = pathlib.Path('pyproject.toml')
-    p.write_text(re.sub(r'^version = \".*\"', 'version = \"${build_version}\"', p.read_text(), count=1, flags=re.M))
-    "
     uv build
-    restore
-    trap - EXIT
 
 # Install the built package as a uv tool
 install: build
@@ -205,6 +165,7 @@ install: build
 
 # Uninstall the uv tool
 uninstall:
+    uv tool uninstall vantage-md || true
     uv tool uninstall vantage || true
 
 # Reinstall the package (useful for development)
@@ -233,7 +194,9 @@ clean:
 
 # ── Release ─────────────────────────────────────────────────────────
 
-# Release both packages: tag, build, publish to npm, create GitHub release.
+# Release both packages: tag, build, publish to PyPI + npm, create GitHub release.
+# Python version is derived from git tags by setuptools-scm — we only create
+# the tag. npm version is bumped in package.json (npm has no scm plugin).
 # Usage: just release patch  (or: minor, major)
 release bump="patch": _ensure-env
     #!/usr/bin/env bash
@@ -243,7 +206,7 @@ release bump="patch": _ensure-env
     just check-ci
 
     # — 2. Compute new versions —
-    cur_py=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+    cur_py=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//' || echo "0.0.0")
     IFS='.' read -r maj min pat <<< "$cur_py"
     case "{{bump}}" in
         major) new_py="$((maj+1)).0.0" ;;
@@ -267,22 +230,21 @@ release bump="patch": _ensure-env
     read -rp "Proceed? [y/N] " confirm < /dev/tty
     [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
 
-    # — 3. Bump versions in source —
-    sed -i "s/^version = \"${cur_py}\"/version = \"${new_py}\"/" pyproject.toml
+    # — 3. Bump npm version (Python version comes from the tag) —
     cd packages/vantage-md && npm version "${new_npm}" --no-git-tag-version && cd ../..
     cd frontend && npm install && cd ..
 
     # — 4. Commit + tag —
-    git add pyproject.toml packages/vantage-md/package.json frontend/package-lock.json
+    git add packages/vantage-md/package.json frontend/package-lock.json
     git commit -m "release: v${new_py} / vantage-md@${new_npm}" --no-verify
     git tag -a "v${new_py}" -m "v${new_py}"
 
-    # — 5. Push (CI handles build, npm publish, and GitHub release) —
+    # — 5. Push (CI handles build, PyPI + npm publish, and GitHub release) —
     git push origin main --follow-tags
 
     echo ""
     echo "Pushed: v${new_py} / vantage-md@${new_npm}"
-    echo "CI will publish npm package and create GitHub release."
+    echo "CI will publish to PyPI + npm and create GitHub release."
 
 # Release only the npm package (vantage-md).
 # Usage: just release-npm patch
