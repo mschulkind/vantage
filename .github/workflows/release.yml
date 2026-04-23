@@ -74,11 +74,19 @@ jobs:
         if: startsWith(github.ref_name, 'v')
         run: uv build
 
-      - name: Create GitHub release
+      - name: Create or update GitHub release
         if: startsWith(github.ref_name, 'v')
         run: |
-          gh release create "${{ github.ref_name }}" dist/*.whl dist/*.tar.gz \
-            --title "${{ github.ref_name }}" \
-            --generate-notes
+          set -euo pipefail
+          tag="${{ github.ref_name }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; uploading artifacts."
+            gh release upload "$tag" dist/*.whl dist/*.tar.gz --clobber
+          else
+            echo "Creating release $tag."
+            gh release create "$tag" dist/*.whl dist/*.tar.gz \
+              --title "$tag" \
+              --generate-notes
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
