@@ -34,6 +34,11 @@ jobs:
       - name: Install Python dependencies
         run: uv sync
 
+      # The frontend imports from the local `vantage-md` package; build it
+      # first so TypeScript + Vite can resolve the module.
+      - name: Build local vantage-md package
+        run: cd packages/vantage-md && npm ci && npx tsup
+
       - name: Install frontend deps
         run: cd frontend && npm ci
 

@@ -39,8 +39,26 @@ jobs:
       - name: Install frontend deps
         run: cd frontend && npm ci
 
-      # --- npm publish with provenance (runs for all release tags) ---
+      # --- npm publish with provenance ---
+      # Skip if the version in package.json is already on the registry. This
+      # lets `v*` tags (Python releases) ride past a stale npm version without
+      # failing the whole workflow; only `vantage-md@*` tags or v* tags that
+      # also bumped npm actually publish.
+      - name: Check if npm version needs publishing
+        id: npm_check
+        run: |
+          set -euo pipefail
+          pkg_version=$(node -p "require('./packages/vantage-md/package.json').version")
+          if npm view "vantage-md@${pkg_version}" version > /dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "vantage-md@${pkg_version} is already on npm; skipping publish."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Publishing vantage-md@${pkg_version}."
+          fi
+
       - name: Publish vantage-md to npm
+        if: steps.npm_check.outputs.skip == 'false'
         run: cd packages/vantage-md && npm publish --provenance --access public
 
       # --- Python build + GitHub release (only for v* tags) ---
