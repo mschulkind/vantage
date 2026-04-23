@@ -23,16 +23,14 @@ setup: install-hooks
     cd packages/vantage-md && npm ci && npx tsup && cd ../..
     cd frontend && npm ci
 
-# Install the git hooks tracked at scripts/hooks/ into .git/hooks/.
-# Idempotent — safe to run on every setup.
+# Point git at the tracked hooks dir. Idempotent — safe to run on every
+# setup. No copying; hooks always match the tracked files at scripts/hooks/.
 install-hooks:
     #!/usr/bin/env bash
     set -euo pipefail
-    hooks_dir="$(git rev-parse --git-path hooks)"
-    for hook in pre-commit commit-msg pre-push; do
-        install -m 0755 "scripts/hooks/${hook}" "${hooks_dir}/${hook}"
-    done
-    echo "Installed hooks: pre-commit, commit-msg, pre-push"
+    chmod +x scripts/hooks/pre-commit scripts/hooks/commit-msg scripts/hooks/pre-push
+    git config core.hooksPath scripts/hooks
+    echo "Hooks active via core.hooksPath=scripts/hooks"
 
 # Run the backend server in development mode
 dev-py path=".":
