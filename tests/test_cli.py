@@ -14,6 +14,7 @@ catch this, because click exits before invoking the callback.
 from __future__ import annotations
 
 import inspect
+import sys
 
 import click
 import pytest
@@ -100,6 +101,7 @@ def test_build_command_actually_runs(tmp_path):
     assert output.exists(), "build command did not create output directory"
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="install-service is Linux/systemd-specific")
 def test_install_service_command_actually_runs(tmp_path, monkeypatch):
     """End-to-end invocation of `vantage install-service` with ``--user``.
 
@@ -118,3 +120,14 @@ def test_install_service_command_actually_runs(tmp_path, monkeypatch):
     )
     service_file = tmp_path / ".config" / "systemd" / "user" / "vantage.service"
     assert service_file.exists(), "install-service did not write service file"
+
+
+@pytest.mark.skipif(sys.platform == "linux", reason="tests the non-Linux platform gate")
+def test_install_service_rejects_non_linux():
+    """On macOS/Windows, `install-service` must exit non-zero with a clear message."""
+    result = CliRunner().invoke(cli, ["install-service", "--user"])
+
+    assert result.exit_code != 0, "install-service should fail on non-Linux platforms"
+    assert "Linux" in result.output, (
+        f"expected a platform-specific error mentioning Linux, got: {result.output!r}"
+    )
