@@ -61,3 +61,6 @@ dist/docs/
 *~
 
 /.chrome-state/
+
+# YOLO Jail workspace state
+.yolo/
